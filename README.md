@@ -2,7 +2,7 @@
 
 <p align="center"><b>A card battle built from your GitHub stars</b></p>
 
-<p align="center">Every repo you've starred is a card. Build a team and beat other developers. No signup.</p>
+<p align="center">Every repo you've starred is a card. Build a team and beat other developers. No signup, free and open source.</p>
 
 <p align="center">
   <a href="https://stard.armanckeser.com/run"><img src="https://img.shields.io/badge/Play_with_your_username-2f9e7a?style=for-the-badge" alt="Play with your username" height="36"></a>
