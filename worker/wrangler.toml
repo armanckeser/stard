@@ -3,7 +3,7 @@
 # token lives here as a secret instead of in visitors' browsers.
 #
 #   npx wrangler secret put GITHUB_TOKEN   # fine-grained PAT, public repos read-only
-#   npx wrangler deploy
+#   npx wrangler deploy                    # CI does this on every push to main (.github/workflows/worker.yml)
 name = "stars-demo-lists"
 main = "src/index.ts"
 compatibility_date = "2026-10-01"
