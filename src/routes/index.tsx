@@ -130,7 +130,7 @@ function AllStarsPage() {
   const [detailRepo, setDetailRepo] = useState<Repo | null>(null);
   const isDesktop = useIsDesktop();
 
-  const allRepos = repos ?? [];
+  const allRepos = useMemo(() => repos ?? [], [repos]);
 
   const listIdsByRepo = useMemo(() => {
     const map = new Map<string, string[]>();
