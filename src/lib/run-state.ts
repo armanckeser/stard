@@ -2,7 +2,7 @@ import type { BoardFight, Spot } from "../components/battle/three/board";
 import { BOOST_ROUNDS, boostOffer } from "../../server/run/boosts";
 import { fight as playFight } from "../../server/run/fight";
 import { benchToBoard, boardToBench, cardsOf, emptyBench, swapBench, toBench, without, type Roster } from "../../server/run/roster";
-import { SLOT_COST, boardLimit } from "../../server/run/rules";
+import { SLOT_COST, boardLimit, freeCell } from "../../server/run/rules";
 import type { Side, Snapshot } from "../../server/run/types";
 import type { RoundResult } from "./challenge";
 import { LOSSES_TO_END, NEW_TALLY, REROLL_COST, START_GOLD, WINS_TO_FINISH, costOf, countRound, inHalf, shopFor, snapshot, winnerOf, type Player, type RunFighter, type Tally, type Unit } from "./run";
@@ -219,11 +219,15 @@ function rebuilt(building: Building, action: BuildAction, seed: string): Buildin
 const rosterOf = (run: Run): Roster => ({ board: run.units, bench: run.bench });
 const withRoster = (run: Run, roster: Roster): Run => ({ ...run, units: roster.board, bench: roster.bench });
 
+// A bought card goes straight onto the board while it has room, so a first fight isn't
+// played with the card still waiting on the Drafts shelf.
 function bought(building: Building, slot: number): Building | null {
-  const { run, shelf } = building;
+  const { run, round, shelf } = building;
   const fighter = shelf.cards[slot];
   if (!fighter || run.gold < costOf(fighter)) return null;
-  const roster = toBench(rosterOf(run), fighter);
+  const now = rosterOf(run);
+  const cell = now.board.length < boardLimit(round.number, run.bought) ? freeCell(now.board, fighter.card) : null;
+  const roster = cell ? { ...now, board: [...now.board, { fighter, ...cell }] } : toBench(now, fighter);
   if (!roster) return null;
   return { ...building, run: { ...withRoster(run, roster), gold: run.gold - costOf(fighter) }, shelf: { ...shelf, cards: shelf.cards.map((card, index) => (index === slot ? null : card)) } };
 }
