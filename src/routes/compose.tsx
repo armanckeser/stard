@@ -17,7 +17,8 @@ import { RepoPickerSheet } from "@/components/compose/repo-picker-sheet";
 import { SectionList } from "@/components/compose/section-list";
 import { profilePrompt } from "@/lib/agent-prompt";
 import { listCollection, listItemCollection, repoCollection } from "@/lib/collections";
-import { demoUser } from "@/lib/demo";
+import { DEMO, demoUser } from "@/lib/demo";
+import { loadUserStars } from "@/lib/demo-load-user";
 import { defaultCharacter } from "../../server/character";
 import {
   DEFAULT_RATING_MIN,
@@ -47,7 +48,8 @@ function ComposePage() {
   const [now] = useState(() => Date.now());
   const [edited, setEditedState] = useState<Composition | null>(kept);
   // One pane at a time on a phone; both side by side from lg up.
-  const [pane, setPane] = useState<"edit" | "readme">("readme");
+  // The demo opens on someone else's stars, so a visitor starts where they put in their own name.
+  const [pane, setPane] = useState<"edit" | "readme">(DEMO ? "edit" : "readme");
   const [format, setFormat] = useState<"preview" | "markdown">("preview");
   const [pickingFor, setPickingFor] = useState<string | null>(null);
   const [leftOutOpen, setLeftOutOpen] = useState(false);
@@ -103,6 +105,28 @@ function ComposePage() {
   const login = composition.login.trim();
   const loginOk = validLogin(login);
 
+  // The demo holds one person's stars at a time; a README signed by anyone else would show that person's repos.
+  const [shown, setShown] = useState(demoUser.current);
+  const [loadStatus, setLoadStatus] = useState("");
+  const [loadingStars, setLoadingStars] = useState(false);
+  const otherUser = DEMO && loginOk && login.toLowerCase() !== (shown ?? "").toLowerCase();
+
+  async function loadStars() {
+    if (!otherUser || loadingStars) return;
+    setLoadingStars(true);
+    try {
+      await loadUserStars(login, setLoadStatus);
+      demoUser.current = login;
+      setShown(login);
+      setLoadStatus("");
+      startOver();
+    } catch (error) {
+      setLoadStatus(error instanceof Error ? error.message : "Couldn't read those stars.");
+    } finally {
+      setLoadingStars(false);
+    }
+  }
+
   function download() {
     const url = URL.createObjectURL(new Blob([composed.markdown], { type: "text/markdown" }));
     const link = document.createElement("a");
@@ -133,19 +157,30 @@ function ComposePage() {
               <Label htmlFor="compose-login">GitHub username</Label>
               <Help label="About the username">Each card is signed with this name. Without a username the README is plain text with no cards.</Help>
             </div>
-            <Input
-              id="compose-login"
-              value={composition.login}
-              placeholder="octocat"
-              autoCapitalize="none"
-              autoCorrect="off"
-              spellCheck={false}
-              aria-invalid={login !== "" && !loginOk}
-              onChange={(e) => update((c) => ({ ...c, login: e.target.value.replace(/^@/, "") }))}
-            />
+            <form className="flex gap-2" onSubmit={(e) => { e.preventDefault(); void loadStars(); }}>
+              <Input
+                id="compose-login"
+                value={composition.login}
+                placeholder="octocat"
+                autoCapitalize="none"
+                autoCorrect="off"
+                spellCheck={false}
+                enterKeyHint="go"
+                aria-invalid={login !== "" && !loginOk}
+                onChange={(e) => update((c) => ({ ...c, login: e.target.value.replace(/^@/, "") }))}
+              />
+              {otherUser && (
+                <Button type="submit" disabled={loadingStars}>{loadingStars ? "Loading..." : "Load"}</Button>
+              )}
+            </form>
             {!loginOk && (
               <p className="text-xs text-muted-foreground">
                 {login === "" ? "Add your username to turn the sections below into cards." : "That isn't a GitHub username."}
+              </p>
+            )}
+            {otherUser && (
+              <p className="text-xs text-muted-foreground" role="status">
+                {loadStatus || `The sections below are @${shown}'s stars. Load @${login}'s to make a README from them.`}
               </p>
             )}
           </div>
@@ -262,8 +297,8 @@ function ComposePage() {
                   <TabsTrigger value="markdown">Markdown</TabsTrigger>
                 </TabsList>
               </Tabs>
-              <CopyButton text={composed.markdown} label="Copy" />
-              <Button variant="outline" size="sm" onClick={download} aria-label="Download README.md" title="Download README.md">
+              <CopyButton text={composed.markdown} label="Copy" disabled={otherUser} />
+              <Button variant="outline" size="sm" onClick={download} disabled={otherUser} aria-label="Download README.md" title="Download README.md">
                 <Download />
               </Button>
             </div>
