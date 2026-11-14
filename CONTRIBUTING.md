@@ -56,7 +56,7 @@ published by hand, once:
 
 1. On an up-to-date `main`: `npm login`, then `npm run publish:first`.
 2. On npmjs.com, open the package's Settings, Trusted publishing, and add GitHub Actions with
-   owner `armanckeser`, repository `github-stars-organizer`, workflow `release.yml`. A new trusted
+   owner `armanckeser`, repository `stard`, workflow `release.yml`. A new trusted
    publisher expires unless something publishes through it within 2 days, so release the next
    version soon after.
 3. Optional, once the release workflow has published: set the package's publishing access to
