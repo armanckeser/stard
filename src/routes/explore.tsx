@@ -75,7 +75,7 @@ function ExplorePage() {
     }
   }
 
-  const allRepos = repos ?? [];
+  const allRepos = useMemo(() => repos ?? [], [repos]);
   const now = Date.now();
 
   const { topLanguage, topLanguagePercent, languages } = useMemo(() => {

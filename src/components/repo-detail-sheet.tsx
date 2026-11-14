@@ -87,15 +87,18 @@ export function RepoDetailSheet({ repo, lists, listItems, open, onOpenChange }: 
   const [saveStatus, setSaveStatus] = useState<"idle" | "saving" | "saved">("idle");
   const debounceRef = useRef<ReturnType<typeof setTimeout>>(null);
 
+  const repoId = repo?.id;
+  // Only a different repo resets the box; a live update to this one must not
+  // overwrite what's being typed.
   useEffect(() => {
     if (repo) setNotes(repo.notes ?? "");
-  }, [repo?.id]);
+  }, [repoId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const saveNotes = useCallback(async (value: string) => {
-    if (!repo) return;
+    if (!repoId) return;
     setSaveStatus("saving");
     try {
-      await repoCollection.update(repo.id, (draft) => { draft.notes = value; }).isPersisted.promise;
+      await repoCollection.update(repoId, (draft) => { draft.notes = value; }).isPersisted.promise;
     } catch {
       // The write rolled back and a toast says why; don't claim it saved.
       setSaveStatus("idle");
@@ -103,7 +106,7 @@ export function RepoDetailSheet({ repo, lists, listItems, open, onOpenChange }: 
     }
     setSaveStatus("saved");
     setTimeout(() => setSaveStatus("idle"), 1500);
-  }, [repo?.id]);
+  }, [repoId]);
 
   function handleNotesChange(value: string) {
     setNotes(value);

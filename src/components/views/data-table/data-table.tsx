@@ -154,7 +154,8 @@ export function DataTable<TData, TValue>({
           toggleVisibility: (value: boolean) => col.toggleVisibility(value),
         })),
     }),
-    [table, columnVisibility],
+    // `table` keeps its identity when a column is hidden; columnVisibility is what changes.
+    [table, columnVisibility], // eslint-disable-line react-hooks/exhaustive-deps
   );
 
   return (

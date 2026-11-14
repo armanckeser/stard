@@ -6,7 +6,7 @@ import tseslint from 'typescript-eslint'
 import { defineConfig, globalIgnores } from 'eslint/config'
 
 export default defineConfig([
-  globalIgnores(['dist']),
+  globalIgnores(['dist', '.worktrees']),
   {
     files: ['**/*.{ts,tsx}'],
     extends: [
@@ -19,9 +19,9 @@ export default defineConfig([
       globals: globals.browser,
     },
     rules: {
-      // TanStack Router route files legitimately export both a component and a
-      // `Route = createFileRoute(...)` const; downgrade to a warning.
-      'react-refresh/only-export-components': 'warn',
+      // Route files export `Route` beside their components and shadcn files export
+      // variants; splitting them only buys a hot reload instead of a full one in dev.
+      'react-refresh/only-export-components': 'off',
       // react-hooks v7 RC flags idiomatic Date.now() during render as impure.
       'react-hooks/purity': 'off',
       // react-hooks v7 RC flags the standard prop->local-state sync effect.
