@@ -80,7 +80,8 @@ describe("sign-in", () => {
     const cookie = (await signIn(other, "correct horse")).headers.get("set-cookie")!.split(";")[0];
 
     expect((await app.request("/api/me", { headers: { Cookie: cookie } })).status).toBe(401);
-  });
+    // Two PGlite databases boot here, which can pass the 5s default on a CI runner.
+  }, 20_000);
 
   test("agent_token_is_accepted_as_a_bearer", async () => {
     const app = await setUp(PASSWORD);
