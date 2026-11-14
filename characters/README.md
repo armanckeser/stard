@@ -11,7 +11,7 @@ The picture comes from `npx vite scripts/character-gallery`.
 The files for the accounts in [OPPONENTS.md](../OPPONENTS.md) are drawn by hand from each account's public avatar, with plain parts only: hair, glasses, top and colours.
 
 - Change it: add a file `character.md` with the keys below to a public repo of your own called `stard`. Your own file always wins over the one here.
-- Remove it: open an issue (https://github.com/armanckeser/github-stars-organizer/issues/new?title=Remove%20my%20character) or message the owner on GitHub, and the file is deleted.
+- Remove it: open an issue (https://github.com/armanckeser/stard/issues/new?title=Remove%20my%20character) or message the owner on GitHub, and the file is deleted.
 - An account that opted out of being played ([OPPONENTS.md](../OPPONENTS.md#dont-want-to-be-played)) never shows the file here.
 
 The game reads, in this order: `character.md` in your `stard` repo, then a trainer card in your `stard` or profile README, then the file here, then a look made from your username.

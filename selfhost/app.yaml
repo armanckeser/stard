@@ -15,9 +15,9 @@ description: |
   Needs a classic GitHub token with the repo scope, which you paste into the install form. Create one at https://github.com/settings/tokens/new?scopes=repo Tags, ratings and notes stay in this server's database; Lists and unstars are written to GitHub. Not affiliated with GitHub.
 category: developer
 developer: Armanc Keser
-website: https://github.com/armanckeser/github-stars-organizer
-repo: https://github.com/armanckeser/github-stars-organizer
-support: https://github.com/armanckeser/github-stars-organizer/issues
+website: https://github.com/armanckeser/stard
+repo: https://github.com/armanckeser/stard
+support: https://github.com/armanckeser/stard/issues
 license: AGPL-3.0-or-later
 icon: selfhost/icon.png
 screenshots:

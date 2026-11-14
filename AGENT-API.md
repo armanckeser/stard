@@ -74,7 +74,7 @@ A real match is a GitHub Discussion in the challenger's profile repo, titled "St
 
 ```text
 Stard is running at http://127.0.0.1:5185. Read
-https://github.com/armanckeser/github-stars-organizer/blob/main/AGENT-API.md, then
+https://github.com/armanckeser/stard/blob/main/AGENT-API.md, then
 fetch my stars and Lists with POST /api/local/import. Suggest which List each repo
 in no List belongs in, and any new Lists worth creating. Show me the plan as a
 table and wait for my OK before changing anything.

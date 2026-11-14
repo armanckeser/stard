@@ -34,7 +34,7 @@ show a plan and wait for the user's OK before any write.
 
 ## Make the user's Stard profile
 
-A Stard profile is a block for the user's GitHub profile README: their top four repos, a few short reviews, and their Lists, drawn as cards. The cards are images whose address holds what they show, so nothing has to be running. Read the "Profile cards" section of AGENT-API.md (https://github.com/armanckeser/github-stars-organizer/blob/main/AGENT-API.md#profile-cards) for the addresses and the Markdown.
+A Stard profile is a block for the user's GitHub profile README: their top four repos, a few short reviews, and their Lists, drawn as cards. The cards are images whose address holds what they show, so nothing has to be running. Read the "Profile cards" section of AGENT-API.md (https://github.com/armanckeser/stard/blob/main/AGENT-API.md#profile-cards) for the addresses and the Markdown.
 
 The profile is the user's taste, so get the content by asking, one question at a time:
 
@@ -55,7 +55,7 @@ Then build the Markdown, show the whole block, and wait for a yes. Offer two way
    up the user's stars and Lists first.
 
 The full API is in
-[AGENT-API.md](https://github.com/armanckeser/github-stars-organizer/blob/main/AGENT-API.md).
+[AGENT-API.md](https://github.com/armanckeser/stard/blob/main/AGENT-API.md).
 Every request except `GET` needs `Content-Type: application/json`, including `DELETE`.
 
 ## Sort stars into Lists
