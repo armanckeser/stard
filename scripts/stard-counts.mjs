@@ -10,7 +10,7 @@ import { execFileSync } from "node:child_process";
 import { pathToFileURL } from "node:url";
 
 const DATASET = "stard_events";
-const REPO = "armanckeser/github-stars-organizer";
+const REPO = "armanckeser/stard";
 const DEFAULT_DAYS = 14;
 const DAY_MS = 24 * 60 * 60 * 1000;
 

@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, redirect } from "@tanstack/react-router";
 import { useLiveQuery } from "@tanstack/react-db";
 import { useState, useMemo, useCallback, useEffect } from "react";
 import { z } from "zod";
@@ -55,9 +55,18 @@ const searchSchema = z.object({
   lists: z.string().optional(),
 });
 
+// The demo's bare address opens on Play, the game the site leads with. Only the first
+// page of a visit: the stars table stays one tap away, and a card's ?user= link still lands here.
+let landed = false;
+
 export const Route = createFileRoute("/")({
   component: AllStarsPage,
   validateSearch: searchSchema,
+  beforeLoad: () => {
+    const first = !landed;
+    landed = true;
+    if (DEMO && first && window.location.search === "") throw redirect({ to: "/run" });
+  },
 });
 
 const API_URL = import.meta.env.VITE_API_URL ?? "http://localhost:4000";

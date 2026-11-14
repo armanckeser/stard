@@ -159,7 +159,7 @@ function AboutLine() {
       )}
       <p className="flex items-center gap-1.5">
         Stard v{__APP_VERSION__}
-        <a href="https://github.com/armanckeser/github-stars-organizer" target="_blank" rel="noopener"
+        <a href="https://github.com/armanckeser/stard" target="_blank" rel="noopener"
           aria-label="Source code on GitHub" title="Source code on GitHub"
           className="-m-1 rounded p-1 text-muted-foreground transition-colors hover:text-foreground">
           <MarkGithubIcon size={14} />
@@ -170,7 +170,7 @@ function AboutLine() {
   );
 }
 
-const SELF = "armanckeser/github-stars-organizer";
+const SELF = "armanckeser/stard";
 
 // Stars the repo with the app's own token; the demo has no token, so it links
 // to the repo page. Hidden once the repo is among the stars on screen.
@@ -204,7 +204,7 @@ function DemoNote() {
   return (
     <>
       Demo: public stars read from GitHub. Lists, tags and notes you make stay in this tab.{" "}
-      <a href="https://github.com/armanckeser/github-stars-organizer" className="font-medium text-primary underline-offset-4 hover:underline">
+      <a href="https://github.com/armanckeser/stard" className="font-medium text-primary underline-offset-4 hover:underline">
         Self-host it
       </a>{" "}
       to sync with your own account.{" "}

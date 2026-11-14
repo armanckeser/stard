@@ -6,7 +6,7 @@ GitHub Stars Organizer is a private, self-hosted personal tool, not a public ser
 
 If you find a security issue, please report it privately through GitHub Security Advisories:
 
-**[Report a vulnerability](https://github.com/armanckeser/github-stars-organizer/security/advisories/new)**
+**[Report a vulnerability](https://github.com/armanckeser/stard/security/advisories/new)**
 
 Please do not open a public issue for anything security-sensitive.
 

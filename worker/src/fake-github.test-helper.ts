@@ -139,7 +139,7 @@ function stargazers(url: URL): Response {
 /** A stand-in for `fetch` that answers GitHub's GraphQL endpoint and this repo's stargazers. */
 export async function fakeGitHub(input: RequestInfo | URL, init?: RequestInit): Promise<Response> {
   const url = new URL(input instanceof Request ? input.url : String(input));
-  if (url.pathname === "/repos/armanckeser/github-stars-organizer/stargazers") return stargazers(url);
+  if (url.pathname === "/repos/armanckeser/stard/stargazers") return stargazers(url);
   const { query } = JSON.parse(String(init?.body)) as { query: string };
   const user = /user\(login: "([^"]+)"\)/.exec(query);
   if (user) {

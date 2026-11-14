@@ -220,7 +220,7 @@ describe("starring Stard", () => {
     const { fake, call } = await setUp();
     const { status } = await call("POST", "/api/star-self");
     expect(status).toBe(200);
-    expect(fake.writes).toContain("star armanckeser/github-stars-organizer");
+    expect(fake.writes).toContain("star armanckeser/stard");
   });
 
   test("starSelf_asks_for_a_token_when_there_is_none", async () => {

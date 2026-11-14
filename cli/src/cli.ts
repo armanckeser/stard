@@ -15,7 +15,7 @@ import { buildIndex, formatResults, readIndex, saveIndex, searchStars, isStale }
 const DEFAULT_PORT = 5185;
 const EXIT_FAILURE = 1;
 
-const SOURCE_URL = "https://github.com/armanckeser/github-stars-organizer";
+const SOURCE_URL = "https://github.com/armanckeser/stard";
 
 // The GPL's recommended notice for interactive programs, shown at every start.
 const NOTICE = `Stard v${__APP_VERSION__}  Copyright (C) 2026 Armanc Keser

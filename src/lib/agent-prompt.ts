@@ -3,7 +3,7 @@ import { APP_MODE } from "./mode";
 // The copy-paste prompt (the robot icon beside Import Stars) that points an AI agent at this install's API.
 // AGENT-API.md documents both versions; the prompt names the right one.
 
-export const AGENT_GUIDE_URL = "https://github.com/armanckeser/github-stars-organizer/blob/main/AGENT-API.md";
+export const AGENT_GUIDE_URL = "https://github.com/armanckeser/stard/blob/main/AGENT-API.md";
 
 const ASK = "Suggest which List each repo in no List belongs in, and any new Lists worth creating. Show me the plan as a table and wait for my OK before changing anything.";
 
