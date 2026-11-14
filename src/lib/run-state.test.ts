@@ -82,12 +82,22 @@ describe("a new run", () => {
 });
 
 describe("the shop", () => {
-  it("buys a card onto the Drafts shelf for its price", () => {
+  it("buys a card straight onto the board for its price while the board has room", () => {
+    // Regression guarded: a bought card waited on the Drafts shelf, so a first-time player
+    // pressed Fight with one card on the board and lost the run without knowing why.
     const next = runReducer(shopping(), { type: "buy", slot: 0 });
     const run = sceneOf(next.phase).run!;
     expect(run.gold).toBe(3);
-    expect(run.bench.filter((card) => card !== null)).toHaveLength(1);
+    expect(run.units).toHaveLength(2);
+    expect(run.bench.filter((card) => card !== null)).toHaveLength(0);
     expect(next.phase.kind === "shop" && next.phase.shelf.cards[0]).toBeNull();
+  });
+
+  it("puts a bought card on the Drafts shelf once the board is full", () => {
+    const next = play(shopping(), { type: "buy", slot: 0 }, { type: "buy", slot: 1 });
+    const run = sceneOf(next.phase).run!;
+    expect(run.units).toHaveLength(2);
+    expect(run.bench.filter((card) => card !== null)).toHaveLength(1);
   });
 
   it("refuses a buy it can't afford", () => {

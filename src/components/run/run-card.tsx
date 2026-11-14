@@ -1,6 +1,6 @@
 import { BrickWall, Coins, Crosshair, Gauge, Heart, Shield, Star, Sword, Swords, Zap, type LucideIcon } from "lucide-react";
 import { CommitGrid, TYPE, useCreature } from "@/components/battle/repo-card";
-import { isLight, languageColor } from "@/lib/card-colors";
+import { compact, isLight, languageColor } from "@/lib/card-colors";
 import { abilityById } from "../../../server/run/abilities";
 import { RARITY_NAMES, setName } from "../../../server/run/names";
 import { priceOf, type RunFighter } from "../../../server/run/rules";
@@ -20,11 +20,13 @@ const ROLES: Record<Role, { label: string; Icon: LucideIcon }> = {
   ranged: { label: "Ranged", Icon: Crosshair },
 };
 
+// `from` names the repo fact each number leans on (server/run/stats.ts), so a player can
+// see why their favourite repo hits hard or doesn't.
 const NUMBERS = [
-  { key: "hp", label: "HP", Icon: Heart },
-  { key: "attack", label: "Attack", Icon: Zap },
-  { key: "guard", label: "Guard", Icon: Shield },
-  { key: "speed", label: "Speed", Icon: Gauge },
+  { key: "hp", label: "HP", Icon: Heart, from: "contributors" },
+  { key: "attack", label: "Attack", Icon: Zap, from: "commits" },
+  { key: "guard", label: "Guard", Icon: Shield, from: "issues closed" },
+  { key: "speed", label: "Speed", Icon: Gauge, from: "recent pushes" },
 ] as const;
 
 /** How many of a set's cards are on `team` once `card` is with them, and the bonus that gives. */
@@ -82,13 +84,14 @@ export function RunCard({ fighter, team }: { fighter: RunFighter; team: RunFight
           </div>
 
           <div className="grid grid-cols-4" style={{ margin: "1.6cqw 3cqw 0", gap: "1.2cqw" }}>
-            {NUMBERS.map(({ key, label, Icon }) => (
+            {NUMBERS.map(({ key, label, Icon, from }) => (
               <div key={key} className="flex flex-col items-center rounded-[1.4cqw]" style={{ background: `${type.color}26`, padding: "0.8cqw 0" }}>
                 <span className="flex items-center font-semibold uppercase text-[#1b1d21]/70" style={{ fontSize: "2.4cqw", gap: "0.6cqw", letterSpacing: "0.06em" }}>
                   <Icon style={{ width: "2.8cqw", height: "2.8cqw" }} aria-hidden />
                   {label}
                 </span>
                 <span className="font-display font-bold tabular-nums" style={{ fontSize: "6cqw", lineHeight: 1.1 }}>{card[key]}</span>
+                <span className="text-[#1b1d21]/55" style={{ fontSize: "2.2cqw", lineHeight: 1.2 }}>{from}</span>
               </div>
             ))}
           </div>
@@ -108,7 +111,7 @@ export function RunCard({ fighter, team }: { fighter: RunFighter; team: RunFight
           </ul>
 
           <div className="mt-auto flex items-center justify-between text-[#1b1d21]/55" style={{ fontSize: "2.5cqw", padding: "0.8cqw 3.4cqw 1.6cqw" }}>
-            <span className="min-w-0 truncate">{owner}/{title}</span>
+            <span className="min-w-0 truncate">{owner}/{title} · ★ {compact(fighter.stars)}</span>
             <span className="flex shrink-0 items-center font-semibold" style={{ gap: "0.6cqw" }}>
               {fighter.home && "home · "}
               {fighter.popular && "popular on GitHub · "}

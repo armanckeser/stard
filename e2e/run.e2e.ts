@@ -131,17 +131,19 @@ async function expectNear(page: Page, fullName: string, target: Spot) {
   }).toBeLessThan(30);
 }
 
-test("a bought card waits on the Drafts shelf, then drags to a cell on the board", async ({ page }) => {
+test("a bought card goes onto the board while it has room, then to the Drafts shelf", async ({ page }) => {
   await startRun(page);
   const name = await buyCheapest(page);
   expect(name).not.toBeNull();
-  await expectOnShelf(page, name!, 0);
-  await expect(page.getByLabel("1 of 2 cards on the board").locator("visible=true")).toBeVisible();
-
-  await drag(page, (await unitSpot(page, name!))!, await cellSpot(page, 2, 1));
-
   await expect(page.getByLabel("2 of 2 cards on the board").locator("visible=true")).toBeVisible();
+  await settled(page);
+  await drag(page, (await unitSpot(page, name!))!, await cellSpot(page, 2, 1));
   await expectAt(page, name!, 2, 1);
+
+  const next = await buyCheapest(page);
+  expect(next).not.toBeNull();
+  await expectOnShelf(page, next!, 0);
+  await expect(page.getByLabel("2 of 2 cards on the board").locator("visible=true")).toBeVisible();
 });
 
 test("a board creature dragged to a free cell moves there", async ({ page }) => {
@@ -154,7 +156,7 @@ test("a board creature dragged to a free cell moves there", async ({ page }) => 
 test("two creatures trade cells when one is dropped on the other", async ({ page }) => {
   await startRun(page);
   const name = (await buyCheapest(page))!;
-  await expectOnShelf(page, name, 0);
+  await settled(page);
   await drag(page, (await unitSpot(page, name))!, await cellSpot(page, 0, 1));
   await expectAt(page, name, 0, 1);
 
@@ -169,6 +171,7 @@ test("a creature dropped in the Archive is sold for its price", async ({ page })
   const before = await gold(page);
   const name = (await buyCheapest(page))!;
   const paid = before - (await gold(page));
+  await settled(page);
   await drag(page, (await unitSpot(page, name))!, await cellSpot(page, 2, 1));
   await expect(page.getByLabel("2 of 2 cards on the board").locator("visible=true")).toBeVisible();
 
@@ -282,7 +285,6 @@ test("a whole run plays to its end, with the two boost picks", async ({ page, wo
     while (onBoard < limit && free.length > 0 && (bought = await buyCheapest(page))) {
       const [col, row] = free.shift()!;
       await settled(page);
-      await expectOnShelf(page, bought, 0);
       await drag(page, (await unitSpot(page, bought))!, await cellSpot(page, col, row));
       onBoard++;
       await expect(page.getByLabel(`${onBoard} of ${limit} cards on the board`).locator("visible=true")).toBeVisible();

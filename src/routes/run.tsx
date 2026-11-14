@@ -159,6 +159,14 @@ function RunPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Escape folds the help away, as it closes an open card.
+  useEffect(() => {
+    if (!help) return;
+    const fold = (event: KeyboardEvent) => event.key === "Escape" && setHelp(false);
+    window.addEventListener("keydown", fold);
+    return () => window.removeEventListener("keydown", fold);
+  }, [help]);
+
   // Each loading phase reads what it waits for; the answer names its run's seed, so a newer run drops it.
   const loadingRun = phase.kind === "loading-run" ? phase : null;
   useEffect(() => {
@@ -309,7 +317,7 @@ function RunPage() {
                   <BarButton label="Reroll" cost={REROLL_COST} icon={<RotateCw className="size-4" strokeWidth={2.6} />} disabled={gold < REROLL_COST} onClick={() => dispatch({ type: "reroll" })} aria-label={`Reroll for ${REROLL_COST} gold`} />
                   <TeamSlots count={units.length} limit={cap} gold={gold} onBuy={() => dispatch({ type: "buy-slot" })} />
                 </div>
-                <div className="shop-cards"><Shop shop={building.shelf.cards} held={cardsOf(roster)} gold={gold} draftsFull={!bench.includes(null)} onOpen={(slot) => dispatch({ type: "look-shop", slot })} /></div>
+                <div className="shop-cards"><Shop shop={building.shelf.cards} held={cardsOf(roster)} gold={gold} draftsFull={!bench.includes(null) && units.length >= cap} onOpen={(slot) => dispatch({ type: "look-shop", slot })} /></div>
               </div>
             </div>
           </div>
@@ -328,7 +336,12 @@ function RunPage() {
 
       {(phase.kind === "round-result" || phase.kind === "loading-round") && (
         <div className="absolute inset-x-0 bottom-0 z-10 flex items-center justify-between gap-3 border-t border-white/15 bg-[#0c1014]/90 px-4 py-4 backdrop-blur-sm">
-          <p className="font-display text-lg font-bold tracking-tight sm:text-2xl" aria-live="polite">{resultLine(phase.kind === "round-result" ? phase : phase.after)}</p>
+          <div aria-live="polite">
+            <p className="font-display text-lg font-bold tracking-tight sm:text-2xl">{resultLine(phase.kind === "round-result" ? phase : phase.after)}</p>
+            {phase.kind === "round-result" && phase.winner === 1 && units.length < cap && (
+              <p className="text-sm text-white/70">Your board had room for {cap - units.length} more {cap - units.length === 1 ? "card" : "cards"}. Buy from the shop to fill it.</p>
+            )}
+          </div>
           {phase.kind === "round-result" ? <Button onClick={() => dispatch({ type: "continue" })}>Continue</Button> : <Button disabled>Reading the next team...</Button>}
         </div>
       )}
@@ -349,7 +362,7 @@ function RunPage() {
             <li className="flex gap-2"><Coins className="mt-0.5 size-4 shrink-0 text-[#ffd84d]" /> Tap a shop card to see the card, then buy. Cards come from your stars, topped up with popular repos when you have only a few. {ROUND_GOLD} gold each round, {WIN_GOLD} more for a win.</li>
             <li className="flex gap-2"><Swords className="mt-0.5 size-4 shrink-0" /> Tanks take hits, Assassins deal them, Bruisers do both. All three hit the enemy next to them: put them in the front row.</li>
             <li className="flex gap-2"><Crosshair className="mt-0.5 size-4 shrink-0" /> Ranged cards hit from three cells away. Keep them behind.</li>
-            <li className="flex gap-2"><Swords className="mt-0.5 size-4 shrink-0" /> Bought cards wait on the Drafts shelf. Drag between the shelf and the board, or into the Archive to sell for the full price. Only the board counts toward the team.</li>
+            <li className="flex gap-2"><Swords className="mt-0.5 size-4 shrink-0" /> Bought cards go onto the board while it has room, then wait on the Drafts shelf. Drag between the shelf and the board, or into the Archive to sell for the full price. Only the board counts toward the team.</li>
             <li className="flex gap-2"><Layers className="mt-0.5 size-4 shrink-0 text-[#35c450]" /> Two or three cards that share a language or topic give each other a bonus.</li>
             <li className="flex gap-2"><Star className="mt-0.5 size-4 shrink-0" /> Press Fight and watch. {WINS_TO_FINISH} wins finishes the run, {LOSSES_TO_END} losses ends the run.</li>
           </ul>
@@ -379,8 +392,8 @@ function RunPage() {
 
       <InspectOverlay fighter={viewing?.fighter ?? null} onClose={close} card={viewing && <RunCard fighter={viewing.fighter} team={viewingTeam.map((unit) => unit.fighter)} />}>
         {viewing?.kind === "shop" && shopUsable && (
-          <Button className="w-full" disabled={gold < costOf(viewing.fighter) || !bench.includes(null)} onClick={() => { dispatch({ type: "buy", slot: viewing.slot }); close(); }}>
-            <Coins /> {!bench.includes(null) ? "Bench is full" : gold < costOf(viewing.fighter) ? `Costs ${costOf(viewing.fighter)}, you have ${gold}` : `Buy for ${costOf(viewing.fighter)}`}
+          <Button className="w-full" disabled={gold < costOf(viewing.fighter) || (!bench.includes(null) && units.length >= cap)} onClick={() => { dispatch({ type: "buy", slot: viewing.slot }); close(); }}>
+            <Coins /> {!bench.includes(null) && units.length >= cap ? "Board and Drafts are full" : gold < costOf(viewing.fighter) ? `Costs ${costOf(viewing.fighter)}, you have ${gold}` : `Buy for ${costOf(viewing.fighter)}`}
           </Button>
         )}
         {(viewing?.kind === "board" || viewing?.kind === "drafts") && shopUsable && <Button variant="outline" className="w-full" onClick={() => dispatch({ type: "sell", id: idOf(0, viewing.fighter) })}><Coins /> Sell for {costOf(viewing.fighter)}</Button>}
