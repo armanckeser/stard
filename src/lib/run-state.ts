@@ -289,7 +289,7 @@ function continued(phase: Extract<Phase, { kind: "round-result" }>, seed: string
 }
 
 // The same seed as the Worker's offer (worker/src/run.ts), so both offer the same three.
-const offerAt = (run: Run, round: number, seed: string): Offer => ({ round, ids: boostOffer(`${run.player.login}|${seed}|${round}`, run.boosts) });
+export const offerAt = (run: Run, round: number, seed: string): Offer => ({ round, ids: boostOffer(`${run.player.login}|${seed}|${round}`, run.boosts) });
 
 function picked(state: RunState, id: string): RunState {
   const phase = state.phase;
