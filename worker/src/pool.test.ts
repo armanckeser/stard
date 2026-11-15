@@ -64,6 +64,29 @@ describe("GET /api/run/pool", () => {
     expect(response.status).toBe(400);
   });
 
+  describe("with an ace picked", () => {
+    const withAce = async (ace: string) => {
+      vi.stubGlobal("fetch", fakeGitHub);
+      return (await (await poolResponse(new URLSearchParams({ login: GUEST, ace }), "a-token")).json()) as RunPool;
+    };
+
+    test("leads with the picked ace when it is one of the aces on offer, and offers what the profile, pins and own repos have", async () => {
+      const pool = await withAce("city-college/mascot");
+
+      expect(pool.aces).toEqual(["greendale/paintball-assassin", "city-college/mascot"]);
+      expect(pool.team[0].fullName).toBe("city-college/mascot");
+      expect(pool.choice).toEqual({ ace: "city-college/mascot" });
+    });
+
+    // An ace is a free card in round 1; any repo at all would let a player start with the strongest one on GitHub.
+    test("lets go of an ace that isn't on offer", async () => {
+      const pool = await withAce("honda-dealership/sponsor-0");
+
+      expect(pool.team[0].fullName).toBe("greendale/paintball-assassin");
+      expect(pool.choice).toEqual({});
+    });
+  });
+
   describe("with a deck", () => {
     const deckOf = async (deck: string) => {
       vi.stubGlobal("fetch", fakeGitHub);
@@ -80,7 +103,7 @@ describe("GET /api/run/pool", () => {
       const { status, body } = await deckOf(STRONG_DECK);
 
       expect(status).toBe(200);
-      expect(body.deck).toBe(STRONG_DECK);
+      expect(body.choice).toEqual({ deck: STRONG_DECK });
       expect(strong(body)).toBe(20);
       // The ace, 20 from the List, and all 13 stars outside it: short of 40 rather than more of the List.
       expect(body.team).toHaveLength(1 + 20 + 13);
@@ -90,7 +113,7 @@ describe("GET /api/run/pool", () => {
       vi.stubGlobal("fetch", fakeGitHub);
       const pool = (await (await poolResponse(new URLSearchParams({ login: COLLECTOR }), "a-token")).json()) as RunPool;
 
-      expect(pool.deck).toBeUndefined();
+      expect(pool.choice).toEqual({});
       expect(pool.team).toHaveLength(40);
       // The decks the Play screen offers: public Lists only, by name and slug.
       expect(pool.decks).toEqual([{ slug: STRONG_DECK, name: "legends" }]);

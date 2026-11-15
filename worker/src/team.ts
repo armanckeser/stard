@@ -1,8 +1,9 @@
+import { decodeLook, isClass, type ClassId } from "../../server/character.ts";
 import { BOOST_ROUNDS, boostById } from "../../server/run/boosts.ts";
 import { LOSSES_TO_END, OPPONENTS, ROUND_GOLD, SLOT_COST, START_GOLD, WINS_TO_FINISH, WIN_GOLD, boardLimit, inHalf, winnerOf, type RunFighter } from "../../server/run/rules.ts";
 import { SAVED_TEAM_VERSION, finalUnits, recordOf, type SavedRound, type SavedTeam } from "../../server/run/saved-team.ts";
 import type { Snapshot } from "../../server/run/types.ts";
-import { DECK_SLUG } from "./battle.ts";
+import { choiceIn } from "./battle.ts";
 import { LOGIN } from "./cards.ts";
 import type { CountEvent } from "./events.ts";
 import type { OptOuts } from "./no-play.ts";
@@ -21,7 +22,7 @@ import {
 // An account that opted out of being played against (worker/src/no-play.ts) gets no
 // team link, and a link to its team stops opening once it opts out.
 //
-//   POST /api/run/team {login, seed, rounds, against?, deck?}  the team's link token (short id or sealed), and the team
+//   POST /api/run/team {login, seed, rounds, against?, deck?, ace?, look?}  the team's link token (short id or sealed), and the team
 //   GET  /api/run/team?t=<token>                  the team, once the token checks out
 //   GET  /team?t=<token>[&to=<friend>]            the app's page, with the team's link-preview tags
 //
@@ -29,7 +30,8 @@ import {
 // `{units: [{repo: "owner/name", col, row}], boosts: [<boost id>]}`.
 // `seed` is the run's seed (newRunSeed), which picked its opponents and seeded its fights.
 // `against` is the token of the saved team the run was played against, if it was.
-// `deck` is the slug of the List the run's pool leaned on (worker/src/battle.ts), if any.
+// `deck` and `ace` are what the run's pool was dealt with (worker/src/battle.ts), if any.
+// `look` is `{class, look}`, the character's class and look as picked in the Play screen.
 
 export const TEAM_PATH = /^\/api\/run\/team$/;
 export const TEAM_PAGE_PATH = /^\/team\/?$/;
@@ -40,6 +42,8 @@ const MAX_ROUNDS = 20;
 const CACHE_SECONDS = 86400;
 // newRunSeed's is 32 characters; this only bounds what a request may send.
 const MAX_SEED_CHARS = 64;
+// encodeLook's code is a few dozen characters; this only bounds what a request may send.
+const MAX_LOOK_CHARS = 200;
 
 /**
  * The most board slots a player could have bought by a round: every gold piece a run
@@ -90,21 +94,35 @@ function checkedRound(pool: RunFighter[], login: string, round: PlayedRound, num
   return { units, boosts: round.boosts };
 }
 
+/**
+ * The class and look picked in the Play screen (src/lib/choices.ts), or null when none was.
+ * Only these two: each is one of a fixed set, so a team link saved under someone's
+ * username (the demo has no sign-in) can't carry words they never wrote. A name and a
+ * motto still come from the player's own GitHub.
+ */
+function lookIn(value: unknown): { klass: ClassId; look: string } | null {
+  if (value === undefined || value === null) return null;
+  const fields = typeof value === "object" && !Array.isArray(value) ? (value as Record<string, unknown>) : {};
+  if (!isClass(fields.class as string) || typeof fields.look !== "string" || fields.look.length > MAX_LOOK_CHARS) throw new RunRefused("A look is a class and the look's code.", BAD_REQUEST);
+  return { klass: fields.class as ClassId, look: fields.look };
+}
+
 async function saveTeam(body: Record<string, unknown>, deps: RunDeps, key: string) {
   const login = typeof body.login === "string" ? body.login : "";
   if (!LOGIN.test(login)) throw new RunRefused("A team needs its player's GitHub username.", BAD_REQUEST);
   if (body.against !== undefined && typeof body.against !== "string") throw new RunRefused("A team to play against is its link's token.", BAD_REQUEST);
   const seed = typeof body.seed === "string" ? body.seed : "";
   if (seed.length === 0 || seed.length > MAX_SEED_CHARS) throw new RunRefused("A team needs its run's seed.", BAD_REQUEST);
-  const deck = body.deck ?? undefined;
-  if (deck !== undefined && (typeof deck !== "string" || !DECK_SLUG.test(deck))) throw new RunRefused("A deck is one of the player's Lists, by the name in its address.", BAD_REQUEST);
+  const choice = choiceIn(body.deck, body.ace);
+  if (typeof choice === "string") throw new RunRefused(choice, BAD_REQUEST);
+  const look = lookIn(body.look);
   const played = roundsIn(body.rounds);
   const against = typeof body.against === "string" ? await openTeam(body.against, key, deps.links) : null;
   // Nobody else may play against an opted-out account, so its team gets no link to be played from.
   // Asked before the stars are read, so a blocked account's are never read.
   const ownOptOut = await deps.optedOut([login]);
   if (ownOptOut.length > 0) throw new RunRefused(`${login} has asked not to be played against, so their team gets no link.`, REFUSED);
-  const [player, optedOut] = await Promise.all([deps.read(login, deck),deps.optedOut(OPPONENTS), against ? playableTeam(against, login, deps.optedOut) : null]);
+  const [player, optedOut] = await Promise.all([deps.read(login, choice), deps.optedOut(OPPONENTS), against ? playableTeam(against, login, deps.optedOut) : null]);
   const day = new Date(deps.now).toISOString().slice(0, 10);
 
   const rounds: SavedRound[] = [];
@@ -129,7 +147,7 @@ async function saveTeam(body: Record<string, unknown>, deps: RunDeps, key: strin
     v: SAVED_TEAM_VERSION,
     login: player.login,
     avatarUrl: player.avatarUrl,
-    character: player.character,
+    character: look ? { ...player.character, klass: look.klass, look: decodeLook(look.look, player.character.look) } : player.character,
     day,
     wins,
     losses,

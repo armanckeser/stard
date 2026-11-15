@@ -15,8 +15,13 @@ const RUN_ORIGIN = APP_MODE === "local" ? window.location.origin : CARD_ORIGIN;
 
 /** One of a player's public Lists, offered as a deck: its name, and the slug a pool read names it by. */
 export type DeckChoice = { slug: string; name: string };
-/** `deck` is the List the pool leaned on, when it did; `decks` the player's public Lists (a Worker from before decks sends none). */
-export type Player = { login: string; avatarUrl: string | null; supporter?: true; character: Character & { level: number }; team: RunFighter[]; deck?: string; decks?: DeckChoice[] };
+/** What a pool was dealt with: a deck (a List's slug) and an ace (owner/name), as the Worker honoured them. */
+export type PoolChoice = { deck?: string; ace?: string };
+/**
+ * `choice` is what the pool was dealt with; `decks` the player's public Lists and `aces` the
+ * repos they may lead with (a Worker from before the Customize sheet sends none of the three).
+ */
+export type Player = { login: string; avatarUrl: string | null; supporter?: true; character: Character & { level: number }; team: RunFighter[]; choice?: PoolChoice; decks?: DeckChoice[]; aces?: string[] };
 
 // One read per account and day for the page, so the first opponent can be read while
 // the player's own cards are (a cold read is several seconds each), and a new run reads
@@ -24,22 +29,23 @@ export type Player = { login: string; avatarUrl: string | null; supporter?: true
 const reads = new Map<string, Promise<Player>>();
 const today = () => new Date().toISOString().slice(0, 10);
 
-/** An account's cards. `forRun` names whose run reads them, when that is someone else's; `deck` one of their Lists to lean on. */
-export function fetchPlayer(login: string, forRun?: string, deck?: string): Promise<Player> {
-  const key = `${login.toLowerCase()}|${forRun?.toLowerCase() ?? ""}|${deck ?? ""}|${today()}`;
+/** An account's cards. `forRun` names whose run reads them, when that is someone else's; `choice` what the player picked to deal them with. */
+export function fetchPlayer(login: string, forRun?: string, choice: PoolChoice = {}): Promise<Player> {
+  const key = `${login.toLowerCase()}|${forRun?.toLowerCase() ?? ""}|${choice.deck ?? ""}|${choice.ace ?? ""}|${today()}`;
   const known = reads.get(key);
   if (known) return known;
-  const read = readPlayer(login, forRun, deck);
+  const read = readPlayer(login, forRun, choice);
   reads.set(key, read);
   read.catch(() => reads.delete(key));
   return read;
 }
 
-async function readPlayer(login: string, forRun?: string, deck?: string): Promise<Player> {
+async function readPlayer(login: string, forRun: string | undefined, choice: PoolChoice): Promise<Player> {
   const url = new URL("/api/run/pool", RUN_ORIGIN);
   url.searchParams.set("login", login);
   if (forRun) url.searchParams.set("for", forRun);
-  if (deck) url.searchParams.set("deck", deck);
+  if (choice.deck) url.searchParams.set("deck", choice.deck);
+  if (choice.ace) url.searchParams.set("ace", choice.ace);
   url.searchParams.set("_shape", RESPONSE_SHAPE);
   const response = await fetch(url);
   const body = (await response.json()) as Player & { error?: string };

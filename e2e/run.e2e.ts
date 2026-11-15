@@ -306,7 +306,7 @@ test("a whole run plays to its end, with the two boost picks", async ({ page, wo
   await expect(page.getByText(/^Run (finished|over)$/)).toBeVisible();
   await expect(page.getByText(/^\d wins?, \d loss(es)?$/)).toBeVisible();
   expect(picks).toBe(2);
-  await expect(page.getByRole("button", { name: "Copy team link" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Customize your team" })).toBeVisible();
   // The dev server's StrictMode runs the save effect twice; each save is the player's team.
   expect(new Set(worker.teamsSaved)).toEqual(new Set(["abed"]));
 
@@ -511,38 +511,48 @@ test("New run clears the last run's opponent, round and shop before the new run 
   await expect(page.getByRole("status").filter({ hasText: "Dealing a new run..." })).toHaveCount(0);
 });
 
-test("a deck picked at a run's end deals the next run, and its team is saved with that deck", async ({ page }) => {
-  // Regression guarded: a run dealt from a List, saved without it, replays against the
-  // whole-stars pool and the Worker refuses cards that aren't in it.
+test("Customize your team deals the next run with the picked deck and ace, and its team link carries them and the class", async ({ page }) => {
+  // Regression guarded: a run dealt from a List or with a picked ace, saved without them,
+  // replays against another pool and the Worker refuses cards that aren't in it.
   test.setTimeout(360_000);
-  const decksRead: string[] = [];
-  const saves: { deck?: string }[] = [];
+  const poolChoices: string[] = [];
+  const saves: { deck?: string; ace?: string; look?: { class: string } }[] = [];
   await page.route("**/api/run/team", (route) => {
     if (route.request().method() !== "POST") return route.fallback();
-    saves.push(route.request().postDataJSON() as { deck?: string });
+    saves.push(route.request().postDataJSON() as (typeof saves)[number]);
     return route.fulfill({ json: { token: SAVED_TOKEN } });
   });
-  await startRun(page, "", (login) => {
-    const pool = strongAbed(login);
-    return login === "abed" ? { ...pool, decks: [{ slug: "web-tools", name: "Web tools" }] } : pool;
-  });
+  const abed = (deck: string | null, ace: string | null) => {
+    const pool = strongAbed("abed");
+    const aces = [pool.team[0].fullName, pool.team[1].fullName];
+    return { ...pool, decks: [{ slug: "web-tools", name: "Web tools" }], aces, choice: { ...(deck ? { deck } : {}), ...(ace ? { ace } : {}) } };
+  };
+  await startRun(page, "", (login) => (login === "abed" ? abed(null, null) : strongAbed(login)));
   await page.route("**/api/run/pool?*", (route) => {
     const url = new URL(route.request().url());
     const login = url.searchParams.get("login") ?? "abed";
-    const deck = url.searchParams.get("deck");
-    if (deck) decksRead.push(deck);
-    const pool = strongAbed(login);
-    return route.fulfill({ json: login === "abed" ? { ...pool, decks: [{ slug: "web-tools", name: "Web tools" }], ...(deck ? { deck } : {}) } : pool });
+    if (login !== "abed") return route.fulfill({ json: strongAbed(login) });
+    poolChoices.push(`${url.searchParams.get("deck")}|${url.searchParams.get("ace")}`);
+    return route.fulfill({ json: abed(url.searchParams.get("deck"), url.searchParams.get("ace")) });
   });
   await fightToEnd(page);
+  // The dev server's StrictMode runs the save effect twice; each save is the same team.
+  await expect.poll(() => saves.length).toBeGreaterThan(0);
+  const firstRun = saves.length;
+  expect(saves.at(-1)).toMatchObject({ look: { class: "rookie" } });
   expect(saves.at(-1)?.deck).toBeUndefined();
 
-  await page.getByLabel("Deck").selectOption("web-tools");
-  await expect(page.getByLabel("Next run's deck")).toHaveValue("web-tools");
+  const secondAce = strongAbed("abed").team[1].fullName;
+  await page.getByRole("button", { name: "Customize your team" }).click();
+  const sheet = page.getByRole("dialog", { name: "Customize your team" });
+  await sheet.getByLabel("Deck").selectOption("web-tools");
+  await sheet.getByLabel("Ace").selectOption(secondAce);
+  await sheet.getByRole("radio", { name: /Scout/ }).click();
+  await page.keyboard.press("Escape");
   await page.getByRole("button", { name: "New run" }).click();
   await expect(page.getByLabel(/ cards on the board$/).locator("visible=true")).toBeVisible({ timeout: 30_000 });
-  expect(decksRead).toEqual(["web-tools"]);
+  expect(poolChoices).toEqual([`web-tools|${secondAce}`]);
   await fightToEnd(page);
-  await expect.poll(() => saves.at(-1)?.deck).toBe("web-tools");
-  await expect(page.getByLabel("Deck")).toHaveValue("web-tools");
+  await expect.poll(() => saves.length).toBeGreaterThan(firstRun);
+  expect(saves.at(-1)).toMatchObject({ deck: "web-tools", ace: secondAce, look: { class: "scout" } });
 });

@@ -1,13 +1,14 @@
 import { useEffect, useRef, useState } from "react";
-import { Check, Layers, Link2, RotateCcw, Swords } from "lucide-react";
+import { Check, Link2, Palette, RotateCcw, Swords } from "lucide-react";
 import { StarStard } from "@/components/star-stard";
 import { TeamTiles } from "@/components/run/team-tiles";
 import { Input } from "@/components/ui/input";
 import { beatLine, beatenIn, challengeLink, challengeMessage, type RoundResult } from "@/lib/challenge";
-import { chooseDeck, deckFor } from "@/lib/deck";
+import { CharacterSheet } from "@/components/compose/character-sheet";
+import { choicesFor, pickFor, type Choices } from "@/lib/choices";
 import { countEvent } from "@/lib/events";
 import { APP_URL, validLogin } from "@/lib/published-list";
-import { WINS_TO_FINISH, type DeckChoice, type Unit } from "@/lib/run";
+import { WINS_TO_FINISH, type Player, type Unit } from "@/lib/run";
 import { recordOf, saveTeam, teamLink } from "@/lib/saved-team";
 import type { Snapshot } from "../../../server/run/types";
 
@@ -25,12 +26,9 @@ const COPIED_FOR = 1500;
  * to beat that team. The Worker plays the run's fights again before it hands back the
  * team's link (worker/src/team.ts).
  */
-export function RunEnd({ login, deck, decks, seed, rounds, results, team, wins, losses, against, onNewRun }: {
-  login: string;
-  /** The List this run's pool leaned on, if any. */
-  deck?: string;
-  /** The player's public Lists, to pick the next run's deck from. */
-  decks: DeckChoice[];
+export function RunEnd({ player, seed, rounds, results, team, wins, losses, against, onNewRun }: {
+  /** Whose run it was, as it was dealt: their pool choice and character go into the team's link. */
+  player: Player;
   /** The run's seed, which the Worker replays the fights with. */
   seed: string;
   /** The team as fought at each round, round 1 first. */
@@ -48,13 +46,13 @@ export function RunEnd({ login, deck, decks, seed, rounds, results, team, wins, 
   useEffect(() => {
     let live = true;
     setSaving({ state: "saving" });
-    saveTeam(login, seed, rounds, against, deck)
+    saveTeam(player, seed, rounds, against)
       .then(({ token }) => live && setSaving({ state: "saved", link: teamLink(token) }))
       .catch((cause: unknown) => live && setSaving({ state: "failed", message: cause instanceof Error && cause.message !== "Failed to fetch" ? cause.message : "The team couldn't be saved." }));
     return () => {
       live = false;
     };
-  }, [login, seed, rounds, against, deck]);
+  }, [player, seed, rounds, against]);
   const beaten = beatenIn(results);
   const lead = beatLine(beaten);
   const newRun = <button type="button" className="hud-button run-panel-link" onClick={onNewRun}><RotateCcw className="size-4" /> New run</button>;
@@ -77,42 +75,70 @@ export function RunEnd({ login, deck, decks, seed, rounds, results, team, wins, 
         <Challenge beaten={beaten} link={saving.state === "saved" ? saving.link : null} />
       )}
       <div className="run-panel-quiet">
-        {saving.state === "saved" ? <CopyLink text={saving.link} label="Copy team link" /> : saving.state === "saving" ? <span className="run-panel-note">Saving the team...</span> : <CopyLink text={`${APP_URL}run`} label="Copy Play link" />}
+        {saving.state === "failed" ? <CopyLink text={`${APP_URL}run`} label="Copy Play link" /> : <Customize player={player} />}
         {saving.state !== "failed" && newRun}
         <StarStard className="text-white/55 hover:text-white" />
       </div>
-      <DeckPick login={login} played={deck} decks={decks} />
       {saving.state === "failed" && <p className="run-panel-note text-center" role="alert">{saving.message} The link opens the Play screen instead.</p>}
     </section>
   );
 }
 
 /**
- * The next run's deck: all the player's stars, or one of their public Lists, which then
- * deals up to half the shop (worker/src/battle.ts). Kept in this browser (src/lib/deck.ts).
+ * Customize your team: the character's class and look, the ace, and the deck, for the next
+ * run and its team link. Kept in this browser (src/lib/choices.ts); a name and a motto stay
+ * with the player's GitHub (worker/src/team.ts says why).
  */
-function DeckPick({ login, played, decks }: { login: string; played?: string; decks: DeckChoice[] }) {
-  const [picked, setPicked] = useState(() => deckFor(login) ?? "");
-  if (decks.length === 0) {
-    return (
-      <p className="run-panel-note text-center">
-        Play a playstyle: make a public List of your stars on GitHub, and it becomes a deck here.{" "}
-        <a className="underline underline-offset-4 hover:text-white" href={`https://github.com/${login}?tab=stars`} target="_blank" rel="noopener noreferrer">Your stars</a>
-      </p>
-    );
-  }
-  const pick = (slug: string) => {
-    setPicked(slug);
-    chooseDeck(login, slug || undefined);
-  };
+function Customize({ player }: { player: Player }) {
+  const { login } = player;
+  const [open, setOpen] = useState(false);
+  const [picked, setPicked] = useState(() => choicesFor(login));
+  const pick = (change: Choices) => setPicked(pickFor(login, change));
+  const character = { ...player.character, ...(picked.klass ? { klass: picked.klass } : {}), ...(picked.look ? { look: picked.look } : {}) };
+  const aces = player.aces ?? [];
+  const decks = player.decks ?? [];
   return (
-    <label className="run-deck">
-      <Layers className="size-4" aria-hidden="true" />
-      <span>{picked === (played ?? "") ? "Deck" : "Next run's deck"}</span>
-      <select value={picked} onChange={(event) => pick(event.target.value)}>
-        <option value="">All stars</option>
-        {decks.map((choice) => <option key={choice.slug} value={choice.slug}>{choice.name}</option>)}
+    <>
+      <button type="button" className="hud-button run-panel-link" onClick={() => setOpen(true)}><Palette className="size-4" /> Customize your team</button>
+      <CharacterSheet
+        open={open}
+        onOpenChange={setOpen}
+        login={login}
+        character={character}
+        onChange={(next) => pick({ klass: next.klass, look: next.look })}
+        words={false}
+        title="Customize your team"
+        description="Your next run is dealt with these, and its team link shows them. They're kept in this browser."
+      >
+        <div className="space-y-4">
+          {aces.length > 1 && (
+            <PickRow label="Ace" hint="Your free card in round 1, from your profile, pins and own repos." value={picked.ace ?? ""} onPick={(ace) => pick({ ace: ace || undefined })} options={[{ value: "", label: "Your profile's pick" }, ...aces.map((name) => ({ value: name, label: name }))]} />
+          )}
+          {decks.length > 0 ? (
+            <PickRow label="Deck" hint="A List of your stars deals up to half your shop." value={picked.deck ?? ""} onPick={(deck) => pick({ deck: deck || undefined })} options={[{ value: "", label: "All stars" }, ...decks.map((deck) => ({ value: deck.slug, label: deck.name }))]} />
+          ) : (
+            <p className="text-sm text-muted-foreground">
+              Make a public List of your stars on GitHub, and it becomes a deck here.{" "}
+              <a className="underline underline-offset-4" href={`https://github.com/${login}?tab=stars`} target="_blank" rel="noopener noreferrer">Your stars</a>
+            </p>
+          )}
+          <p className="text-sm text-muted-foreground">
+            For your README card and anyone who challenges you by name, put your character in a <code>stard</code> repo: <code>npx github-stars-organizer</code> opens Stard with your own GitHub login.
+          </p>
+        </div>
+      </CharacterSheet>
+    </>
+  );
+}
+
+function PickRow({ label, hint, value, options, onPick }: { label: string; hint: string; value: string; options: { value: string; label: string }[]; onPick: (value: string) => void }) {
+  return (
+    <label className="block space-y-1.5">
+      <span className="block text-sm font-medium">{label}</span>
+      <select className="h-9 w-full rounded-md border bg-background px-2 text-sm" value={value} onChange={(event) => onPick(event.target.value)}>
+        {options.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
       </select>
+      <span className="block text-xs text-muted-foreground">{hint}</span>
     </label>
   );
 }

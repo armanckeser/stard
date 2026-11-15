@@ -69,7 +69,12 @@ export type FactsStore = {
 type Player = Character & TrainerFacts & { custom: boolean };
 // `facts` is what GitHub said that `team` was worked out from; `evened` cuts `team` only.
 // `supporter` is there, and true, when the player starred this repo.
-export type Team = { login: string; avatarUrl: string | null; supporter?: true; source: TeamSource; character: Player; team: Fighter[]; facts: SideFacts; deck?: string; decks?: DeckChoice[] };
+export type Team = { login: string; avatarUrl: string | null; supporter?: true; source: TeamSource; character: Player; team: Fighter[]; facts: SideFacts; choice?: PoolChoice; decks?: DeckChoice[]; aces?: string[] };
+/**
+ * What a player picked for their pool in the Play screen, as the Worker honoured it: a deck
+ * (one of their public Lists, by slug) and an ace (one of their profile's, pinned or own repos).
+ */
+export type PoolChoice = { deck?: string; ace?: string };
 /** One of the player's public Lists, as a deck to pick: its name, and the slug its address and `deck` use. */
 export type DeckChoice = { slug: string; name: string };
 
@@ -181,6 +186,15 @@ const DECK_READ = 100;
 
 export class NoSuchDeck extends Error {}
 
+const ACE_NAME = /^[A-Za-z0-9_.-]{1,100}\/[A-Za-z0-9_.-]{1,100}$/;
+
+/** A pool choice from a request's `deck` and `ace`, or the reason it isn't one. */
+export function choiceIn(deck: unknown, ace: unknown): PoolChoice | string {
+  if (deck !== undefined && deck !== null && deck !== "" && (typeof deck !== "string" || !DECK_SLUG.test(deck))) return "A deck is one of your Lists, by the name in its address.";
+  if (ace !== undefined && ace !== null && ace !== "" && (typeof ace !== "string" || !ACE_NAME.test(ace))) return "An ace is one of your repos, as owner/name.";
+  return { ...(deck ? { deck: deck as string } : {}), ...(ace ? { ace: ace as string } : {}) };
+}
+
 type Deck = DeckChoice & { id: string; isPrivate: boolean };
 
 // A team is four cards: one ace the player chose and three drawn from their stars for
@@ -188,9 +202,10 @@ type Deck = DeckChoice & { id: string; isPrivate: boolean };
 // first pinned repo, else their own most-starred repo. Someone with too few stars
 // fills the rest from what they chose and then from their own repos, then from
 // `popular` when given (a run's pool, worker/src/popular.ts), and may still come up
-// short; `evened` then trims the other side to match. `deck` is one of the player's
-// public Lists by its slug: up to DECK_SHARE of the cards are drawn from it.
-export async function teamFor(token: string, login: string, now: number, size = TEAM_SIZE, popular?: () => Promise<PopularList>, kept?: FactsStore, deck?: string): Promise<Team> {
+// short; `evened` then trims the other side to match. `choice.deck` is one of the
+// player's public Lists by its slug: up to DECK_SHARE of the cards are drawn from it.
+// `choice.ace` leads the team when it is one of the aces on offer; otherwise it is let go.
+export async function teamFor(token: string, login: string, now: number, size = TEAM_SIZE, popular?: () => Promise<PopularList>, kept?: FactsStore, choice: PoolChoice = {}): Promise<Team> {
   const name = JSON.stringify(login);
   const starred = supporters(token, now);
   const data = await gql<{
@@ -255,11 +270,16 @@ export async function teamFor(token: string, login: string, now: number, size = 
     source = "repos";
     chosen = owned;
   }
+  // The aces a player may pick in the Play screen: what their profile, pins and own repos already offer.
+  const aces = [...new Set([...fromProfile.map((node) => node.nameWithOwner), ...pinned, ...owned])];
+  const pickedAce = choice.ace ? aces.find((name) => name.toLowerCase() === choice.ace!.toLowerCase()) : undefined;
+  if (pickedAce) chosen = [pickedAce, ...chosen.filter((name) => name !== pickedAce)];
   const ace = chosen.slice(0, 1);
   const stars = user.starredRepositories.nodes.filter((repo) => !repo.isPrivate).map((repo) => repo.nameWithOwner);
   if (ace.length === 0 && stars.length > 0) source = "stars";
   const day = new Date(now).toISOString().slice(0, 10);
   // The deck's repos are starred too, so the stars draw skips all of them: the deck fills its share and no more.
+  const deck = choice.deck;
   const inDeck = deck ? await deckRepos(token, user, deck) : [];
   const decked = drawFromStars(inDeck, ace, Math.min(Math.floor(size * DECK_SHARE), size - ace.length), `${user.login.toLowerCase()}|${day}|deck`);
   const drawnNames = [...decked, ...drawFromStars(stars, [...ace, ...inDeck], size - ace.length - decked.length, `${user.login.toLowerCase()}|${day}`)];
@@ -289,7 +309,11 @@ export async function teamFor(token: string, login: string, now: number, size = 
   const team = fieldTeam(repos, user.login, character.klass, now).map((fighter, i) => (repos[i].wildcard ? { ...fighter, wildcard: true } : repos[i].popular ? { ...fighter, popular: true } : fighter));
   const facts: SideFacts = { readAt: new Date(now).toISOString(), character: built, ace: aceNodes[0]?.nameWithOwner ?? null, source, repos };
   const mark = supporterMark(await starred.soFar(), user.login, user.stard?.noPlay ? "left-out" : "in");
-  return { login: user.login, avatarUrl: user.avatarUrl, ...mark, source, character, team, facts, ...(deck ? { deck } : {}), decks: user.lists.nodes.filter((list) => !list.isPrivate).map(({ slug, name }) => ({ slug, name })) };
+  return { login: user.login, avatarUrl: user.avatarUrl, ...mark, source, character, team, facts,
+    choice: { ...(deck ? { deck } : {}), ...(pickedAce ? { ace: pickedAce } : {}) },
+    decks: user.lists.nodes.filter((list) => !list.isPrivate).map(({ slug, name }) => ({ slug, name })),
+    aces,
+  };
 }
 
 /**
@@ -378,12 +402,12 @@ export function withRunCards(player: Team): RunPool {
 export async function poolResponse(params: URLSearchParams, token: string, popular?: () => Promise<PopularList>, facts?: FactsStore): Promise<Response> {
   const login = params.get("login") ?? "";
   if (!LOGIN.test(login)) return json({ error: "A run needs a GitHub username." }, 400, CACHE_SECONDS);
-  const deck = params.get("deck") || undefined;
-  if (deck !== undefined && !DECK_SLUG.test(deck)) return json({ error: "A deck is one of your Lists, by the name in its address." }, 400, CACHE_SECONDS);
+  const choice = choiceIn(params.get("deck"), params.get("ace"));
+  if (typeof choice === "string") return json({ error: choice }, 400, CACHE_SECONDS);
   const busy = busyUntil(Date.now());
   if (busy) return busyReply(busy);
   try {
-    const player = await teamFor(token, login, Date.now(), POOL_SIZE, popular, facts, deck);
+    const player = await teamFor(token, login, Date.now(), POOL_SIZE, popular, facts, choice);
     if (player.team.length === 0) return json({ error: `${player.login} has no public repos to play with.` }, 404, CACHE_SECONDS);
     return json(withRunCards(player), 200, CACHE_SECONDS);
   } catch (error) {
