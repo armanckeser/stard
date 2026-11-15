@@ -76,6 +76,33 @@ function enamelsOf(boosts: Boost[]): Map<string, string> {
   );
 }
 
+/** A boost's medallion, decoded and ready to show. The darkroom keeps each by key, so asking twice draws once. */
+function medalOf(boost: Boost, enamel: string): Promise<string> {
+  const Icon = ICONS[boost.id] ?? Sparkles;
+  const svg = renderToStaticMarkup(<Icon color="#ffffff" strokeWidth={2.4} size={256} />);
+  return medallion(`${boost.id}|${enamel}`, svg, enamel).then(async (url) => {
+    const image = new Image();
+    image.src = url;
+    await image.decode();
+    return url;
+  });
+}
+
+/** The offer's medallions, each `null` where it couldn't be drawn. */
+function medalsOf(boosts: Boost[]): Promise<(string | null)[]> {
+  const enamels = enamelsOf(boosts);
+  return Promise.all(boosts.map((boost) => medalOf(boost, enamels.get(boost.id) ?? ENAMELS[0]).catch(() => null)));
+}
+
+/** Draws an offer's medallions ahead of the pick, while the round before it shows its result, so they show at once. */
+export function prepareBoostPick(offer: string[]): void {
+  void medalsOf(offer.flatMap((id) => boostById(id) ?? []));
+}
+
+// The longest the pick waits for its medallions before it shows blank coins: only for a
+// draw that hangs, since the medallions are drawn while the round's result shows.
+const MEDALS_WAIT = 4000;
+
 const reduced = () => typeof matchMedia !== "undefined" && matchMedia("(prefers-reduced-motion: reduce)").matches;
 
 // How long the chosen medallion plays its pick before the pick closes.
@@ -95,6 +122,23 @@ export function BoostPick({ offer, round, peeking, onPick, onPeek }: Props) {
   const [picked, setPicked] = useState<string | null>(null);
   const boosts = offer.flatMap((id) => boostById(id) ?? []);
   const enamels = enamelsOf(boosts);
+  const key = offer.join(",");
+  // The three rise together once all are drawn: a coin never shows blank and then fills in.
+  const [medals, setMedals] = useState<{ key: string; images: (string | null)[] } | null>(null);
+  useEffect(() => {
+    let live = true;
+    const ids = key.split(",");
+    const late = window.setTimeout(() => live && setMedals({ key, images: ids.map(() => null) }), MEDALS_WAIT);
+    void medalsOf(ids.flatMap((id) => boostById(id) ?? [])).then((images) => {
+      window.clearTimeout(late);
+      if (live) setMedals({ key, images });
+    });
+    return () => {
+      live = false;
+      window.clearTimeout(late);
+    };
+  }, [key]);
+  const images = medals?.key === key ? medals.images : null;
   // A pick that closes with the run (New run, leaving the page) never lands on the run after it.
   const closing = useRef<number | undefined>(undefined);
   useEffect(() => () => window.clearTimeout(closing.current), []);
@@ -118,9 +162,9 @@ export function BoostPick({ offer, round, peeking, onPick, onPeek }: Props) {
         <p id="boost-pick-title" className="boost-title">Pick a boost</p>
         <p className="boost-subtitle">After round {round}. It lasts the run.</p>
       </div>
-      <div className="boost-row">
+      <div className="boost-row" data-waiting={images ? undefined : ""}>
         {boosts.map((boost, index) => (
-          <Medal key={boost.id} boost={boost} enamel={enamels.get(boost.id) ?? ENAMELS[0]} index={index} state={picked === null ? "open" : picked === boost.id ? "chosen" : "passed"} onPick={() => pick(boost.id)} />
+          <Medal key={boost.id} boost={boost} image={images?.[index] ?? null} enamel={enamels.get(boost.id) ?? ENAMELS[0]} index={index} state={picked === null ? "open" : picked === boost.id ? "chosen" : "passed"} onPick={() => pick(boost.id)} />
         ))}
       </div>
       <button type="button" className="boost-peek" onClick={() => onPeek(true)} disabled={picked !== null}>
@@ -130,19 +174,7 @@ export function BoostPick({ offer, round, peeking, onPick, onPeek }: Props) {
   );
 }
 
-function Medal({ boost, enamel, index, state, onPick }: { boost: Boost; enamel: string; index: number; state: "open" | "chosen" | "passed"; onPick: () => void }) {
-  const [image, setImage] = useState<string | null>(null);
-  useEffect(() => {
-    let live = true;
-    const Icon = ICONS[boost.id] ?? Sparkles;
-    const svg = renderToStaticMarkup(<Icon color="#ffffff" strokeWidth={2.4} size={256} />);
-    medallion(`${boost.id}|${enamel}`, svg, enamel)
-      .then((drawn) => live && setImage(drawn))
-      .catch(() => undefined);
-    return () => {
-      live = false;
-    };
-  }, [boost, enamel]);
+function Medal({ boost, image, enamel, index, state, onPick }: { boost: Boost; image: string | null; enamel: string; index: number; state: "open" | "chosen" | "passed"; onPick: () => void }) {
   return (
     <button type="button" className="boost-medal group" data-state={state} style={{ "--order": index } as React.CSSProperties} onClick={onPick} disabled={state !== "open"}>
       <span className="boost-coin" style={{ "--enamel": enamel } as React.CSSProperties}>

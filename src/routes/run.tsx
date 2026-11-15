@@ -11,7 +11,7 @@ import type { BoardUnit } from "@/components/battle/three/board";
 import { FpsMeter } from "@/components/run/fps-meter";
 import { TeamSlots } from "@/components/run/team-slots";
 import { BarButton } from "@/components/run/bar-button";
-import { BoostPick } from "@/components/run/boost-pick";
+import { BoostPick, prepareBoostPick } from "@/components/run/boost-pick";
 import { RunCard } from "@/components/run/run-card";
 import { Checks } from "@/components/run/checks";
 import { useMediaQuery } from "@/hooks/use-media-query";
@@ -21,7 +21,8 @@ import { demoUser } from "@/lib/demo";
 import { countEvent } from "@/lib/events";
 import { validLogin } from "@/lib/published-list";
 import { LOSSES_TO_END, NEW_TALLY, REROLL_COST, ROUND_GOLD, WINS_TO_FINISH, WIN_GOLD, costOf, fetchOpponent, fetchPlayer, newRunSeed, opponentUnits, rangeOf, type Player, type RunFighter, type Unit } from "@/lib/run";
-import { NO_RUN, idOf, runReducer, sceneOf, type Fought, type Run, type RunAction } from "@/lib/run-state";
+import { NO_RUN, idOf, offerAt, runReducer, sceneOf, type Fought, type Run, type RunAction } from "@/lib/run-state";
+import { BOOST_ROUNDS } from "../../server/run/boosts";
 import { openTeam, savedRound, type SavedTeam } from "@/lib/saved-team";
 import { CLASSES } from "../../server/character";
 import { cardsOf, emptyBench, type Roster } from "../../server/run/roster";
@@ -176,6 +177,13 @@ function RunPage() {
   useEffect(() => {
     if (loadingRound) void readNextRound(loadingRound.run, loadingRound.number, seed).then(dispatch);
   }, [loadingRound, seed]);
+
+  // A boost round's medallions are drawn while its result shows, not during the fight, so
+  // the pick opens with all three and the fight keeps its frames.
+  const resultShown = phase.kind === "round-result" ? phase : null;
+  useEffect(() => {
+    if (resultShown && (BOOST_ROUNDS as readonly number[]).includes(resultShown.round.number)) prepareBoostPick(offerAt(resultShown.run, resultShown.round.number, seed).ids);
+  }, [resultShown, seed]);
 
   // The counters (server/events.ts): a round counts once it opens, a run once it ends.
   const openedRound = phase.kind === "shop" || phase.kind === "boost-pick" ? phase.round.number : null;
