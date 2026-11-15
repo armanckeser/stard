@@ -738,6 +738,20 @@ input[type="search"]::-webkit-search-cancel-button {
 button.hud-chip:hover {
   background: rgb(255 255 255 / 0.08);
 }
+/* The ? lights up for a player who has done nothing for a while in round 1 (useIdleNudge in routes/run.tsx). */
+.help-nudge[data-nudge] {
+  background: rgb(242 201 76 / 0.22);
+  box-shadow: 0 0 0 2px rgb(242 201 76 / 0.85);
+}
+@media (prefers-reduced-motion: no-preference) {
+  .help-nudge[data-nudge] {
+    animation: help-nudge 1s ease-in-out infinite alternate;
+  }
+}
+@keyframes help-nudge {
+  from { box-shadow: 0 0 0 2px rgb(242 201 76 / 0.85); }
+  to { box-shadow: 0 0 0 6px rgb(242 201 76 / 0.2); }
+}
 
 /* The Play set tracker (src/components/run/checks.tsx): a pull request's checks. */
 .checks {

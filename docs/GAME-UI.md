@@ -109,6 +109,16 @@ What fired is drawn on the board, not written. One look per effect kind, so ever
 - On screen at rest: names, counts and costs only. Sentences live in the card face, hover text, the boost pick and a fight's creature panel.
 - Motion is short and physical: a lift on pickup, a settle on drop, the lid opening. Respect `prefers-reduced-motion`.
 
+**How the words read.** The owner reviewed every visible line before launch (2026-11-15) against these rules:
+
+- **Name the thing.** No "it", "its", "one", "them", "whoever" or "the rest" where the noun is short. "Rate-limits attackers", not "Whoever hits it is rate limited".
+- **Labels, not sentences.** A button, title or field gets a label ("Play", "Fight"). Full sentences only in Help and in errors.
+- **Card text is game grammar:** "Trigger: effect", the number first, at most 8 words. "Every 3rd hit: heal 10%".
+- **A rule shows once, where it's used.** The HUD's pips show the wins and losses, so the start panel doesn't repeat them.
+- **Explain on demand.** Anything longer than a label sits behind the screen's ? (its rules) or an ⓘ beside one control (`Help` in `src/components/compose/controls.tsx`). How to play never opens by itself: a player who touches nothing for 10 s in round 1 sees the ? light up for 4 s, once.
+- **No plumbing on the happy path.** Browser storage, GitHub threads and `npx` show only in Help, or in the error that needs them.
+- **Show instead of tell.** An example to tap ("torvalds vs gaearon") beats a sentence about what to type.
+
 ## Changed from the first draft
 
 Each change below is a rule that made the screen look worse as first written.

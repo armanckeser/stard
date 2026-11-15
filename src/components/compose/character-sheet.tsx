@@ -35,7 +35,7 @@ export function CharacterSheet({
   character,
   onChange,
   title = "Your character",
-  description = "Stands behind your cards in a battle. The character lives in your README, in the address of its card.",
+  description,
   words = true,
   children,
 }: {
@@ -74,7 +74,7 @@ export function CharacterSheet({
       >
         <SheetHeader>
           <SheetTitle className="font-display text-lg">{title}</SheetTitle>
-          <SheetDescription>{description}</SheetDescription>
+          {description && <SheetDescription>{description}</SheetDescription>}
         </SheetHeader>
         <div className="space-y-6 px-4 pb-6">
           <div className="flex items-center gap-4 rounded-lg p-3" style={{ background: `${klass.color}33` }}>

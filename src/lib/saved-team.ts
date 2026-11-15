@@ -26,7 +26,7 @@ export async function saveTeam(player: Player, seed: string, rounds: Snapshot[],
   const { login, choice, character } = player;
   const body = { login, seed, against, ...choice, look: { class: character.klass, look: encodeLook(character.look) }, rounds: rounds.map((round) => ({ units: round.units.map((unit) => ({ repo: unit.card.fullName, col: unit.col, row: unit.row })), boosts: round.boosts })) };
   const response = await fetch(`${CARD_ORIGIN}/api/run/team`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
-  return answered(response, "The team couldn't be saved.");
+  return answered(response, "Couldn't save your team.");
 }
 
 export async function openTeam(token: string): Promise<SavedTeam> {
