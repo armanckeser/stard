@@ -110,7 +110,6 @@ const PICKED_FOR = 420;
 
 type Props = {
   offer: string[];
-  round: number;
   /** Folded away to look at the board; the run's phase holds it (src/lib/run-state.ts). */
   peeking: boolean;
   onPick: (id: string) => void;
@@ -118,7 +117,7 @@ type Props = {
   onPeek: (peeking: boolean) => void;
 };
 
-export function BoostPick({ offer, round, peeking, onPick, onPeek }: Props) {
+export function BoostPick({ offer, peeking, onPick, onPeek }: Props) {
   const [picked, setPicked] = useState<string | null>(null);
   const boosts = offer.flatMap((id) => boostById(id) ?? []);
   const enamels = enamelsOf(boosts);
@@ -160,7 +159,7 @@ export function BoostPick({ offer, round, peeking, onPick, onPeek }: Props) {
     <div className="boost-pick" role="dialog" aria-modal="true" aria-labelledby="boost-pick-title" data-picked={picked ? "" : undefined}>
       <div className="text-center">
         <p id="boost-pick-title" className="boost-title">Pick a boost</p>
-        <p className="boost-subtitle">After round {round}. It lasts the run.</p>
+        <p className="boost-subtitle">For the rest of the run</p>
       </div>
       <div className="boost-row" data-waiting={images ? undefined : ""}>
         {boosts.map((boost, index) => (

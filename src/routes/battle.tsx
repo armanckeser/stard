@@ -4,6 +4,7 @@ import { Layers, RotateCcw, Send, SkipForward, Swords } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { CopyButton } from "@/components/copy-button";
+import { Help } from "@/components/compose/controls";
 import { ArenaScene, ArenaStage, InspectOverlay, Nameplate, TextBox, repoName, type SideView, type Stance } from "@/components/battle/arena";
 import { Figure } from "@/components/battle/figure";
 import { MatchList } from "@/components/battle/match-list";
@@ -36,13 +37,16 @@ export const Route = createFileRoute("/battle")({
 });
 
 const STEP_MS = 1500;
+// Where a team's cards came from: a short label, and the whole story behind its ⓘ.
 const SOURCE = {
-  profile: "Ace from their profile, the rest drawn from their stars today",
-  pinned: "Ace from their pinned repos, the rest drawn from their stars today",
-  stars: "Drawn from their stars today",
-  repos: "Their top repo, the rest drawn from their stars today",
-  popular: "Popular repos on GitHub, with no stars to draw from",
+  profile: ["Ace: profile", "Ace picked on their profile. Other cards drawn from their stars today."],
+  pinned: ["Ace: pinned repo", "Ace from their pinned repos. Other cards drawn from their stars today."],
+  stars: ["Today's draw", "All cards drawn from their stars today."],
+  repos: ["Ace: top repo", "Ace is their top repo. Other cards drawn from their stars today."],
+  popular: ["Popular repos", "No stars to draw from, so the team is popular repos on GitHub."],
 } as const;
+// Matchups the empty Battle screen offers, so a first visit is one tap from a fight.
+const EXAMPLES = [["torvalds", "gaearon"], ["sindresorhus", "tj"], ["simonw", "antfu"]] as const;
 const NPX = "npx github-stars-organizer";
 
 const otherSide = (side: Side): Side => (side === "a" ? "b" : "a");
@@ -101,9 +105,10 @@ function TeamRow({ team, onInspect, delay }: { team: Team; onInspect: (fighter: 
             <span className="font-medium">{klass.label} · Lv {team.character.level}</span>
             <span className="text-muted-foreground"> · @{team.login}</span>
           </p>
-          <p className="truncate text-xs text-muted-foreground">
-            {team.character.klass === "rookie" ? `${SOURCE[team.source]}.` : `${klass.battlePerk} ${SOURCE[team.source]}.`}
-          </p>
+          <div className="flex items-center gap-1 text-xs text-muted-foreground">
+            <span className="truncate">{team.character.klass === "rookie" ? SOURCE[team.source][0] : `${klass.battlePerk} · ${SOURCE[team.source][0]}`}</span>
+            <Help label="Where these cards come from">{SOURCE[team.source][1]}</Help>
+          </div>
           {team.character.motto && <p className="truncate text-xs text-muted-foreground">“{team.character.motto}”</p>}
         </div>
       </div>
@@ -142,21 +147,21 @@ function ChallengePanel({ battle, me }: { battle: Battle; me: string | null }) {
 
   return (
     <div className="space-y-2 rounded-lg border p-3 text-sm">
-      <p className="font-medium">Play {battle.b.character.name} for real</p>
-      <p className="text-muted-foreground">
-        A real match is turn by turn: you each choose to attack, guard, switch or use a special, over hours or days. The match is a thread on your GitHub profile repo, and {battle.b.login} gets a notification.
-      </p>
+      <div className="flex items-center gap-1">
+        <p className="font-medium">Real match</p>
+        <Help label="About real matches">Turn by turn, on a GitHub thread. @{battle.b.login} gets notified.</Help>
+      </div>
       {!CAN_PLAY ? (
         <div className="flex flex-wrap items-center gap-2">
-          <span className="text-muted-foreground">Moves are posted as you, so playing needs your own copy:</span>
+          <span className="text-muted-foreground">Needs your own copy:</span>
           <CopyButton text={NPX} label={NPX} />
         </div>
       ) : !me ? (
         <p className="text-muted-foreground">Connect GitHub to this copy first.</p>
       ) : !mine ? (
-        <p className="text-muted-foreground">You are signed in as {me}. Put your own username on the left to challenge {battle.b.login}.</p>
+        <p className="text-muted-foreground">Signed in as @{me}. Put @{me} on the left to challenge.</p>
       ) : (
-        <Button onClick={send} disabled={busy}><Send /> {busy ? "Opening the thread..." : `Challenge ${battle.b.login}`}</Button>
+        <Button onClick={send} disabled={busy}><Send /> {busy ? "Opening the thread..." : `Challenge @${battle.b.login}`}</Button>
       )}
       {error && <p role="alert">{error}</p>}
     </div>
@@ -270,9 +275,9 @@ function BattlePage() {
 
   return (
     <div className="mx-auto max-w-5xl space-y-5">
-      <div className="space-y-1">
+      <div className="flex items-center gap-1">
         <h1 className="font-display text-2xl font-bold tracking-tight sm:text-3xl">Battle</h1>
-        <p className="text-sm text-muted-foreground">Two GitHub usernames. Each one's repos fight as cards.</p>
+        <Help label="How Battle works">Each team is an ace plus three cards drawn from that account's stars each day. Both sides play the same number of cards.</Help>
       </div>
 
       <form onSubmit={start} className="flex flex-wrap items-center gap-2">
@@ -287,9 +292,11 @@ function BattlePage() {
       {error && <p className="rounded-lg border border-destructive/40 px-3 py-2 text-sm" role="alert">{error}</p>}
 
       {!battle && !loading && !error && (
-        <p className="rounded-lg border border-dashed px-4 py-8 text-center text-sm text-muted-foreground">
-          A team is four cards: one ace you pick and three drawn from your stars each day. Both sides play the same number of cards.
-        </p>
+        <div className="flex flex-wrap justify-center gap-2 rounded-lg border border-dashed px-4 py-6">
+          {EXAMPLES.map(([left, right]) => (
+            <Button key={left} variant="outline" size="sm" onClick={() => void navigate({ search: { a: left, b: right } })}>{left} vs {right}</Button>
+          ))}
+        </div>
       )}
 
       {battle && phase === "teams" && (
@@ -297,7 +304,7 @@ function BattlePage() {
           <TeamRow team={battle.b} onInspect={setInspecting} delay={0} />
           <div className="flex items-center gap-3">
             <div className="h-px flex-1 bg-border" />
-            <Button size="lg" onClick={() => { setStep(0); setPhase("fight"); }}><Swords /> Start the battle</Button>
+            <Button size="lg" onClick={() => { setStep(0); setPhase("fight"); }}><Swords /> Fight</Button>
             <div className="h-px flex-1 bg-border" />
           </div>
           <TeamRow team={battle.a} onInspect={setInspecting} delay={360} />

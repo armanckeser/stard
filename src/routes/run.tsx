@@ -1,12 +1,14 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { lazy, Suspense, useCallback, useEffect, useMemo, useReducer, useState } from "react";
-import { ArrowLeft, ChevronDown, ChevronUp, CircleHelp, Coins, Crosshair, RotateCw, Layers, Maximize, Minimize, SkipForward, Star, Swords, X } from "lucide-react";
+import { lazy, Suspense, useCallback, useEffect, useMemo, useReducer, useRef, useState } from "react";
+import { ArrowLeft, ChevronDown, ChevronUp, CircleHelp, Coins, Crosshair, Hand, RotateCw, Layers, Maximize, Minimize, Shield, SkipForward, Star, Swords, Users, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { InspectOverlay } from "@/components/battle/arena";
 import { FightClock } from "@/components/battle/fight-clock";
 import { FightInspect } from "@/components/battle/fight-inspect";
 import { Figure } from "@/components/battle/figure";
+import { OpponentsLink } from "@/components/battle/opponents-link";
 import { RunStart } from "@/components/battle/run-start";
+import { NotAffiliated } from "@/components/not-affiliated";
 import type { BoardUnit } from "@/components/battle/three/board";
 import { FpsMeter } from "@/components/run/fps-meter";
 import { TeamSlots } from "@/components/run/team-slots";
@@ -60,6 +62,60 @@ function Pips({ filled, total, tone, label }: { filled: number; total: number; t
     <span className="flex items-center gap-1" aria-label={`${filled} of ${total} ${label}`}>
       {Array.from({ length: total }, (_, i) => <span key={i} className={`size-2.5 rounded-full ${i < filled ? tone : "bg-white/15"}`} />)}
     </span>
+  );
+}
+
+/** The wins and losses as words, for the pips' hover and the player's own profile. */
+const tallyLine = (wins: number, losses: number) => `Wins ${wins}/${WINS_TO_FINISH} · Losses ${losses}/${LOSSES_TO_END}`;
+
+// How long a player sits without touching anything in round 1 before the ? lights up, and for how long.
+const IDLE_MS = 10_000;
+const NUDGE_MS = 4_000;
+
+/**
+ * True for a few seconds once the player has done nothing for IDLE_MS while `watching`:
+ * most players jump straight in, so How to play never opens by itself; the ? glows
+ * for whoever looks stuck. At most once per page load.
+ */
+function useIdleNudge(watching: boolean): boolean {
+  const [on, setOn] = useState(false);
+  const done = useRef(false);
+  useEffect(() => {
+    if (!watching || done.current) return;
+    let off: number | undefined;
+    let idle = window.setTimeout(fire, IDLE_MS);
+    function fire() {
+      done.current = true;
+      setOn(true);
+      off = window.setTimeout(() => setOn(false), NUDGE_MS);
+      stop();
+    }
+    function reset() {
+      window.clearTimeout(idle);
+      idle = window.setTimeout(fire, IDLE_MS);
+    }
+    const events = ["pointerdown", "keydown", "wheel"] as const;
+    function stop() {
+      window.clearTimeout(idle);
+      for (const name of events) window.removeEventListener(name, reset);
+    }
+    for (const name of events) window.addEventListener(name, reset);
+    return () => {
+      stop();
+      window.clearTimeout(off);
+      setOn(false);
+    };
+  }, [watching]);
+  return on;
+}
+
+/** The HUD's ?, which lights up for a player who sits still while `watching`. */
+function HelpButton({ open, onToggle, watching }: { open: boolean; onToggle: () => void; watching: boolean }) {
+  const nudge = useIdleNudge(watching && !open);
+  return (
+    <button type="button" onClick={onToggle} aria-label="How to play" aria-expanded={open} data-nudge={nudge ? "" : undefined} className="hud-chip help-nudge p-2 outline-none focus-visible:ring-2 focus-visible:ring-ring">
+      <CircleHelp className="size-4" />
+    </button>
   );
 }
 
@@ -158,6 +214,7 @@ function RunPage() {
   const bench = run?.bench ?? NO_BENCH;
   const boosts = run?.boosts ?? NO_BOOSTS;
   const { wins, losses } = run?.tally ?? NEW_TALLY;
+  const tally = tallyLine(wins, losses);
   const gold = run?.gold ?? 0;
 
   const [fast, setFast] = useState(false);
@@ -250,6 +307,7 @@ function RunPage() {
     const drafts = bench.flatMap((fighter, slot) => (fighter ? [{ id: idOf(0, fighter), side: 0 as Side, fighter, x: 0, y: 0, ranged: rangeOf(fighter) > 1, bench: slot }] : []));
     return [...side(0, units), ...drafts, ...side(1, round?.theirs ?? [])];
   }, [units, bench, round]);
+  // Round 1 with the shop up: a player who sits still here gets the ? lit up.
 
   return (
     <div ref={arenaRef} data-full={full ? "" : undefined} className="arena relative h-dvh w-full overflow-hidden bg-[#080b0f] text-white">
@@ -283,7 +341,7 @@ function RunPage() {
         <div className="hud-top pointer-events-none absolute inset-x-0 top-0 z-10 flex items-start justify-between gap-2 p-2 pl-13 sm:p-3 sm:pl-15">
           <button type="button" onClick={() => setProfile(player)} aria-label={`About ${player.login}`} className={`hud-chip pointer-events-auto flex items-center gap-2 px-2.5 py-1.5 outline-none focus-visible:ring-2 focus-visible:ring-ring`}>
             {player.avatarUrl && <img src={player.avatarUrl} alt="" className="size-6 rounded-full" />}
-            <span className="block space-y-1">
+            <span className="block space-y-1" title={tally}>
               <Pips filled={wins} total={WINS_TO_FINISH} tone="bg-primary" label="wins" />
               <Pips filled={losses} total={LOSSES_TO_END} tone="bg-[#e5484d]" label="losses" />
             </span>
@@ -295,7 +353,7 @@ function RunPage() {
               {round.opponent.avatarUrl && <img src={round.opponent.avatarUrl} alt="" className="size-6 rounded-full" />}
             </button>
             {toggleFull && <button type="button" onClick={toggleFull} aria-label={full ? "Leave full screen" : "Full screen"} className="hud-chip p-2 outline-none focus-visible:ring-2 focus-visible:ring-ring">{full ? <Minimize className="size-4" /> : <Maximize className="size-4" />}</button>}
-            <button type="button" onClick={() => setHelp(!help)} aria-label="How to play" aria-expanded={help} className={`hud-chip p-2 outline-none focus-visible:ring-2 focus-visible:ring-ring`}><CircleHelp className="size-4" /></button>
+            <HelpButton open={help} onToggle={() => setHelp(!help)} watching={phase.kind === "shop" && round.number === 1} />
           </div>
         </div>
       )}
@@ -307,11 +365,12 @@ function RunPage() {
         </div>
       )}
 
-      {phase.kind === "boost-pick" && <BoostPick offer={phase.offer.ids} round={phase.offer.round} peeking={phase.peeking} onPeek={(peeking) => dispatch({ type: "peek", peeking })} onPick={(id) => dispatch({ type: "pick", id })} />}
+      {phase.kind === "boost-pick" && <BoostPick offer={phase.offer.ids} peeking={phase.peeking} onPeek={(peeking) => dispatch({ type: "peek", peeking })} onPick={(id) => dispatch({ type: "pick", id })} />}
 
       {!player && (
-        <div className="absolute inset-0 z-20 flex items-center justify-center bg-black/45 p-4">
-          <RunStart login={login} onLogin={setLogin} onStart={start} loading={phase.kind === "loading-run"} error={phase.kind === "failed" ? phase.message : ""} starting={linked} intro={`Build a team from your stars. ${WINS_TO_FINISH} wins finishes a run, ${LOSSES_TO_END} losses ends one.`} className={`${PANEL} w-full max-w-sm p-5`} />
+        <div className="absolute inset-0 z-20 flex flex-col items-center justify-center gap-3 bg-black/45 p-4">
+          <RunStart login={login} onLogin={setLogin} onStart={start} loading={phase.kind === "loading-run"} error={phase.kind === "failed" ? phase.message : ""} starting={linked} className={`${PANEL} w-full max-w-sm p-5`} />
+          <NotAffiliated />
         </div>
       )}
 
@@ -367,7 +426,7 @@ function RunPage() {
           <div aria-live="polite">
             <p className="font-display text-lg font-bold tracking-tight sm:text-2xl">{resultLine(phase.kind === "round-result" ? phase : phase.after)}</p>
             {phase.kind === "round-result" && phase.winner === 1 && units.length < cap && (
-              <p className="text-sm text-white/70">Your board had room for {cap - units.length} more {cap - units.length === 1 ? "card" : "cards"}. Buy from the shop to fill it.</p>
+              <p className="text-sm text-white/70">{cap - units.length} empty {cap - units.length === 1 ? "spot" : "spots"}</p>
             )}
           </div>
           {phase.kind === "round-result" ? <Button onClick={() => dispatch({ type: "continue" })}>Continue</Button> : <Button disabled>Reading the next team...</Button>}
@@ -387,13 +446,15 @@ function RunPage() {
             <button type="button" onClick={() => setHelp(false)} aria-label="Close" className="rounded p-1 outline-none focus-visible:ring-2 focus-visible:ring-ring"><X className="size-4" /></button>
           </div>
           <ul className="space-y-1.5 text-white/80">
-            <li className="flex gap-2"><Coins className="mt-0.5 size-4 shrink-0 text-[#ffd84d]" /> Tap a shop card to see the card, then buy. Cards come from your stars, topped up with popular repos when you have only a few. {ROUND_GOLD} gold each round, {WIN_GOLD} more for a win.</li>
-            <li className="flex gap-2"><Swords className="mt-0.5 size-4 shrink-0" /> Tanks take hits, Assassins deal them, Bruisers do both. All three hit the enemy next to them: put them in the front row.</li>
-            <li className="flex gap-2"><Crosshair className="mt-0.5 size-4 shrink-0" /> Ranged cards hit from three cells away. Keep them behind.</li>
-            <li className="flex gap-2"><Swords className="mt-0.5 size-4 shrink-0" /> Bought cards go onto the board while it has room, then wait on the Drafts shelf. Drag between the shelf and the board, or into the Archive to sell for the full price. Only the board counts toward the team.</li>
-            <li className="flex gap-2"><Layers className="mt-0.5 size-4 shrink-0 text-[#35c450]" /> Two or three cards that share a language or topic give each other a bonus.</li>
-            <li className="flex gap-2"><Star className="mt-0.5 size-4 shrink-0" /> Press Fight and watch. {WINS_TO_FINISH} wins finishes the run, {LOSSES_TO_END} losses ends the run.</li>
+            <li className="flex gap-2"><Coins className="mt-0.5 size-4 shrink-0 text-[#ffd84d]" /> Tap a card to buy. {ROUND_GOLD} gold a round, +{WIN_GOLD} for a win.</li>
+            <li className="flex gap-2"><Shield className="mt-0.5 size-4 shrink-0" /> Front row: Tanks, Bruisers, Assassins.</li>
+            <li className="flex gap-2"><Crosshair className="mt-0.5 size-4 shrink-0" /> Back row: Ranged.</li>
+            <li className="flex gap-2"><Hand className="mt-0.5 size-4 shrink-0" /> Drag to move. Drop on the Archive to sell.</li>
+            <li className="flex gap-2"><Layers className="mt-0.5 size-4 shrink-0 text-[#35c450]" /> Cards of the same language or topic give a set bonus.</li>
+            <li className="flex gap-2"><Star className="mt-0.5 size-4 shrink-0" /> Win {WINS_TO_FINISH} before you lose {LOSSES_TO_END}.</li>
+            <li className="flex gap-2"><Users className="mt-0.5 size-4 shrink-0" /> <OpponentsLink /></li>
           </ul>
+          <NotAffiliated />
         </div>
       )}
 
@@ -404,6 +465,7 @@ function RunPage() {
             <div>
               <p className="font-display text-xl font-bold tracking-tight">{profile.character.name}</p>
               <p className="text-sm">{CLASSES[profile.character.klass].label} · Lv {profile.character.level}</p>
+              {profile === player && <p className="text-sm text-white/80">{tally}</p>}
               {profile.supporter && <p className="text-xs text-white/70">Starred Stard</p>}
               {profile.character.klass !== "rookie" && <p className="text-xs text-white/70">{CLASSES[profile.character.klass].perk}</p>}
               {profile.character.motto && <p className="mt-1 text-xs text-white/70">“{profile.character.motto}”</p>}

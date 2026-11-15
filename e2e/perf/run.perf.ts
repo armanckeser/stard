@@ -148,7 +148,7 @@ test("a seeded 7-round run, measured scenario by scenario", async ({ page }, tes
 
   await page.goto("/run");
   await page.getByLabel("Your GitHub username").fill("abed");
-  await page.getByRole("button", { name: "Start a run" }).click();
+  await page.getByRole("button", { name: "Play", exact: true }).click();
   await expect(page.getByLabel(/ cards on the board$/).locator("visible=true").first()).toBeVisible({ timeout: 60_000 });
   await page.waitForFunction(() => "stardBoard" in window);
   await page.waitForTimeout(2_000);

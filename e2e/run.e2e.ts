@@ -60,7 +60,7 @@ async function startRun(page: Page, search = "", pool?: (login: string) => Playe
   if (pool) await page.route("**/api/run/pool?*", (route) => route.fulfill({ json: pool(new URL(route.request().url()).searchParams.get("login") ?? "abed") }));
   await page.goto(`/run${search}`);
   await page.getByLabel("Your GitHub username").fill("abed");
-  await page.getByRole("button", { name: "Start a run" }).click();
+  await page.getByRole("button", { name: "Play", exact: true }).click();
   await expect(page.getByLabel("1 of 2 cards on the board").locator("visible=true")).toBeVisible();
   await page.waitForFunction(() => window.stardBoard !== undefined);
 }
@@ -374,7 +374,7 @@ test("a challenge link greets the friend, and Beat this team fills in their name
   await page.getByRole("link", { name: "Beat this team" }).click();
   await expect.poll(() => Object.fromEntries(new URL(page.url()).searchParams)).toEqual({ against: TOKEN, name: "annie" });
   await expect(page.getByLabel("Your GitHub username")).toHaveValue("annie");
-  await expect(page.getByRole("button", { name: "Start a run" })).toBeEnabled();
+  await expect(page.getByRole("button", { name: "Play", exact: true })).toBeEnabled();
 });
 
 test("a team link without a friend, or with one that isn't a username, greets no one", async ({ page }) => {
@@ -424,7 +424,7 @@ test("a challenge goes from one run's end to the friend's own run against that t
   await page.goto(`${link.pathname}${link.search}`);
   await page.getByRole("link", { name: "Beat this team" }).click();
   await expect(page.getByLabel("Your GitHub username")).toHaveValue("annie");
-  await page.getByRole("button", { name: "Start a run" }).click();
+  await page.getByRole("button", { name: "Play", exact: true }).click();
   await expect(page.getByRole("button", { name: "About abed" })).toBeVisible();
   await fightToEnd(page);
   // A development build's StrictMode runs the end screen's save twice, with the same body; each run's save counts once.
@@ -545,8 +545,8 @@ test("Customize your team deals the next run with the picked deck and ace, and i
   const secondAce = strongAbed("abed").team[1].fullName;
   await page.getByRole("button", { name: "Customize your team" }).click();
   const sheet = page.getByRole("dialog", { name: "Customize your team" });
-  await sheet.getByLabel("Deck").selectOption("web-tools");
-  await sheet.getByLabel("Ace").selectOption(secondAce);
+  await sheet.getByLabel("Deck", { exact: true }).selectOption("web-tools");
+  await sheet.getByLabel("Ace", { exact: true }).selectOption(secondAce);
   await sheet.getByRole("radio", { name: /Scout/ }).click();
   await page.keyboard.press("Escape");
   await page.getByRole("button", { name: "New run" }).click();

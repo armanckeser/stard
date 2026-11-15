@@ -4,6 +4,7 @@ import { ArrowLeft, ArrowLeftRight, ExternalLink, Shield, Sparkles, Swords } fro
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { CopyButton } from "@/components/copy-button";
+import { Help } from "@/components/compose/controls";
 import { ArenaScene, ArenaStage, InspectOverlay, Nameplate, TextBox, repoName, type SideView, type Stance } from "@/components/battle/arena";
 import { RepoCard } from "@/components/battle/repo-card";
 import { CAN_PLAY, fetchMatch, playingAs, postComment, type Match } from "@/lib/game-api";
@@ -256,7 +257,7 @@ function GamePage() {
         <div className="space-y-2">
           {switching ? (
             <div className="space-y-2">
-              <p className="text-sm font-medium">Switch to which card? The switch uses your turn.</p>
+              <p className="text-sm font-medium">Switch to</p>
               <div className="grid gap-2 sm:grid-cols-2">
                 {switches.map((action) => {
                   const fighter = state.teams[mine][action.to];
@@ -268,17 +269,23 @@ function GamePage() {
               <Button variant="ghost" size="sm" onClick={() => setSwitching(false)}>Back</Button>
             </div>
           ) : (
+            <div className="space-y-1">
+            <div className="flex items-center gap-1 text-xs font-medium uppercase tracking-wider text-muted-foreground">
+              Your move
+              <Help label="About moves">Attacks charge the special: {ENERGY_FOR_SPECIAL} charges fire it. Guard halves the next hit, but not twice in a row. A switch uses your turn.</Help>
+            </div>
             <div className="grid grid-cols-2 gap-2 lg:grid-cols-4">
               <ActionButton icon={<Swords />} title={active.moves[0].name} detail={hitDetail(attack)} disabled={busy} onClick={() => play({ kind: "attack" })} />
               <ActionButton
                 icon={<Sparkles />}
                 title={active.moves[1].name}
-                detail={special ? hitDetail(special) : `Charge ${charge} of ${ENERGY_FOR_SPECIAL}. Attacking charges the special.`}
+                detail={special ? hitDetail(special) : `Charge ${"●".repeat(charge)}${"○".repeat(Math.max(0, ENERGY_FOR_SPECIAL - charge))}`}
                 disabled={busy || !special}
                 onClick={() => play({ kind: "special" })}
               />
-              <ActionButton icon={<Shield />} title="Guard" detail={can("guard") ? "Halve the next hit you take." : "Not twice in a row."} disabled={busy || !can("guard")} onClick={() => play({ kind: "guard" })} />
-              <ActionButton icon={<ArrowLeftRight />} title="Switch" detail={switches.length ? "Bring in another card." : "No other card is standing."} disabled={busy || switches.length === 0} onClick={() => setSwitching(true)} />
+              <ActionButton icon={<Shield />} title="Guard" detail={can("guard") ? "Halves the next hit" : "Not twice in a row"} disabled={busy || !can("guard")} onClick={() => play({ kind: "guard" })} />
+              <ActionButton icon={<ArrowLeftRight />} title="Switch" detail={switches.length ? "Uses your turn" : "No card standing"} disabled={busy || switches.length === 0} onClick={() => setSwitching(true)} />
+            </div>
             </div>
           )}
         </div>
@@ -286,23 +293,22 @@ function GamePage() {
 
       {state.status === "active" && state.forecast.length > 0 && (
         <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
-          <span className="font-medium uppercase tracking-wider">The dice ahead</span>
+          <span className="flex items-center gap-1 font-medium uppercase tracking-wider">Next rolls <Help label="About the rolls">Both players see these.</Help></span>
           {state.forecast.map((roll) => (
             <span key={roll.turn} className="tabular-nums">
               Turn {roll.turn}: {Math.round(roll.variance * 100)}%{roll.critical && <span className="font-semibold text-[#ffd23f]"> critical</span>}
             </span>
           ))}
-          <span>Everyone sees the same rolls, so plan around them.</span>
         </div>
       )}
 
       {!mine && live && (
         <div className="flex flex-wrap items-center gap-2 rounded-lg border px-3 py-2 text-sm text-muted-foreground">
           {CAN_PLAY ? (
-            <span>You are watching{me ? ` as ${me}` : ""}. Only {state.players.a.login} and {state.players.b.login} can move.</span>
+            <span>Watching</span>
           ) : (
             <>
-              <span>You are watching. Moves are posted as the player, so playing needs your own copy:</span>
+              <span>Watching · To play, you need your own copy:</span>
               <CopyButton text={NPX} label={NPX} />
             </>
           )}
@@ -317,7 +323,7 @@ function GamePage() {
       <section className="space-y-2">
         <h2 className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Chat</h2>
         {state.chat.length === 0 ? (
-          <p className="text-sm text-muted-foreground">Comments on the thread that aren't moves show up here.</p>
+          <p className="text-sm text-muted-foreground">No messages yet</p>
         ) : (
           <ul className="max-h-64 space-y-2 overflow-y-auto rounded-lg border p-3">
             {state.chat.map((line) => (

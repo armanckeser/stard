@@ -102,7 +102,7 @@ function SavedTeamPanel({ team, token, to }: { team: SavedTeam; token: string; t
         </div>
       </header>
       <TeamTiles units={finalUnits(team)} />
-      <Link to="/run" search={{ against: token, name: to }} title="A run with your stars, every round against this team as it stood that round" className="hud-button hud-fight run-panel-primary"><Swords className="size-4" /> Beat this team</Link>
+      <Link to="/run" search={{ against: token, name: to }} className="hud-button hud-fight run-panel-primary"><Swords className="size-4" /> Beat this team</Link>
       <div className="run-panel-quiet">
         <StarStard className="text-white/55 hover:text-white" />
         <NotAffiliated />

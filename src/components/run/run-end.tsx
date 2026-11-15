@@ -5,6 +5,7 @@ import { TeamTiles } from "@/components/run/team-tiles";
 import { Input } from "@/components/ui/input";
 import { beatLine, beatenIn, challengeLink, challengeMessage, type RoundResult } from "@/lib/challenge";
 import { CharacterSheet } from "@/components/compose/character-sheet";
+import { Help } from "@/components/compose/controls";
 import { choicesFor, pickFor, type Choices } from "@/lib/choices";
 import { countEvent } from "@/lib/events";
 import { APP_URL, validLogin } from "@/lib/published-list";
@@ -48,7 +49,7 @@ export function RunEnd({ player, seed, rounds, results, team, wins, losses, agai
     setSaving({ state: "saving" });
     saveTeam(player, seed, rounds, against)
       .then(({ token }) => live && setSaving({ state: "saved", link: teamLink(token) }))
-      .catch((cause: unknown) => live && setSaving({ state: "failed", message: cause instanceof Error && cause.message !== "Failed to fetch" ? cause.message : "The team couldn't be saved." }));
+      .catch((cause: unknown) => live && setSaving({ state: "failed", message: cause instanceof Error && cause.message !== "Failed to fetch" ? cause.message : "Couldn't save your team." }));
     return () => {
       live = false;
     };
@@ -79,7 +80,7 @@ export function RunEnd({ player, seed, rounds, results, team, wins, losses, agai
         {saving.state !== "failed" && newRun}
         <StarStard className="text-white/55 hover:text-white" />
       </div>
-      {saving.state === "failed" && <p className="run-panel-note text-center" role="alert">{saving.message} The link opens the Play screen instead.</p>}
+      {saving.state === "failed" && <p className="run-panel-note text-center" role="alert">{saving.message}</p>}
     </section>
   );
 }
@@ -108,23 +109,20 @@ function Customize({ player }: { player: Player }) {
         onChange={(next) => pick({ klass: next.klass, look: next.look })}
         words={false}
         title="Customize your team"
-        description="Your next run is dealt with these, and its team link shows them. They're kept in this browser."
+        description="For your next run"
       >
         <div className="space-y-4">
           {aces.length > 1 && (
-            <PickRow label="Ace" hint="Your free card in round 1, from your profile, pins and own repos." value={picked.ace ?? ""} onPick={(ace) => pick({ ace: ace || undefined })} options={[{ value: "", label: "Your profile's pick" }, ...aces.map((name) => ({ value: name, label: name }))]} />
+            <PickRow label="Ace" hint="Free card in round 1" value={picked.ace ?? ""} onPick={(ace) => pick({ ace: ace || undefined })} options={[{ value: "", label: "Your profile's pick" }, ...aces.map((name) => ({ value: name, label: name }))]} />
           )}
           {decks.length > 0 ? (
-            <PickRow label="Deck" hint="A List of your stars deals up to half your shop." value={picked.deck ?? ""} onPick={(deck) => pick({ deck: deck || undefined })} options={[{ value: "", label: "All stars" }, ...decks.map((deck) => ({ value: deck.slug, label: deck.name }))]} />
+            <PickRow label="Deck" hint="Up to half your shop comes from this List" value={picked.deck ?? ""} onPick={(deck) => pick({ deck: deck || undefined })} options={[{ value: "", label: "All stars" }, ...decks.map((deck) => ({ value: deck.slug, label: deck.name }))]} />
           ) : (
             <p className="text-sm text-muted-foreground">
-              Make a public List of your stars on GitHub, and it becomes a deck here.{" "}
-              <a className="underline underline-offset-4" href={`https://github.com/${login}?tab=stars`} target="_blank" rel="noopener noreferrer">Your stars</a>
+              No Lists yet ·{" "}
+              <a className="underline underline-offset-4" href={`https://github.com/${login}?tab=stars`} target="_blank" rel="noopener noreferrer">Make one on GitHub</a>
             </p>
           )}
-          <p className="text-sm text-muted-foreground">
-            For your README card and anyone who challenges you by name, put your character in a <code>stard</code> repo: <code>npx github-stars-organizer</code> opens Stard with your own GitHub login.
-          </p>
         </div>
       </CharacterSheet>
     </>
@@ -133,13 +131,15 @@ function Customize({ player }: { player: Player }) {
 
 function PickRow({ label, hint, value, options, onPick }: { label: string; hint: string; value: string; options: { value: string; label: string }[]; onPick: (value: string) => void }) {
   return (
-    <label className="block space-y-1.5">
-      <span className="block text-sm font-medium">{label}</span>
-      <select className="h-9 w-full rounded-md border bg-background px-2 text-sm" value={value} onChange={(event) => onPick(event.target.value)}>
+    <div className="space-y-1.5">
+      <div className="flex items-center gap-1">
+        <label htmlFor={`pick-${label}`} className="text-sm font-medium">{label}</label>
+        <Help label={`About ${label.toLowerCase()}`}>{hint}</Help>
+      </div>
+      <select id={`pick-${label}`} className="h-9 w-full rounded-md border bg-background px-2 text-sm" value={value} onChange={(event) => onPick(event.target.value)}>
         {options.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
       </select>
-      <span className="block text-xs text-muted-foreground">{hint}</span>
-    </label>
+    </div>
   );
 }
 

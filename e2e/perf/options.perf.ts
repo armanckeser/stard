@@ -118,7 +118,7 @@ test("what each visual trade-off would buy, on a GPU in software", async ({ page
   await page.route("**/api/run/pool?*", (route) => route.fulfill({ json: poolFor(new URL(route.request().url()).searchParams.get("login") ?? "abed") }));
   await page.goto("/run");
   await page.getByLabel("Your GitHub username").fill("abed");
-  await page.getByRole("button", { name: "Start a run" }).click();
+  await page.getByRole("button", { name: "Play", exact: true }).click();
   await expect(page.getByLabel(/ cards on the board$/).locator("visible=true").first()).toBeVisible({ timeout: 120_000 });
   await page.waitForFunction(() => "stardBoard" in window);
   await page.waitForTimeout(3_000);
