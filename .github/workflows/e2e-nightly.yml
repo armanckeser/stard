@@ -1,0 +1,24 @@
+name: Play nightly
+
+# Every Play screen browser test (e2e/run.e2e.ts), the 3D board drawn in software WebGL. Too
+# slow for every PR (about 10 minutes), so a PR runs only the @smoke test (ci.yml) and this
+# runs each night and on demand. A red run here means a PR merged that broke one.
+
+on:
+  schedule:
+    - cron: '23 5 * * *'
+  workflow_dispatch:
+
+jobs:
+  play-screen:
+    runs-on: ubuntu-latest
+    container: mcr.microsoft.com/playwright:v1.65.0-noble
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: 'npm'
+      - run: npm ci
+      - run: npm run test:e2e

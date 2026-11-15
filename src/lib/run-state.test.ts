@@ -105,6 +105,48 @@ describe("the shop", () => {
     expect(sceneOf(broke.phase).run?.gold).toBe(0);
     expect(runReducer(broke, { type: "buy", slot: 0 })).toBe(broke);
   });
+
+  const shelfOf = (state: RunState) => (state.phase.kind === "shop" ? state.phase.shelf.cards.map((card) => card?.fullName ?? null) : []);
+  const ace = "0:abed/dreamatorium";
+
+  it("rerolls for one gold and shows other cards", () => {
+    const before = shopping();
+    const after = runReducer(before, { type: "reroll" });
+    expect(sceneOf(after.phase).run?.gold).toBe(3);
+    expect(shelfOf(after)).not.toEqual(shelfOf(before));
+  });
+
+  it("deals another first shop for another run seed", () => {
+    // Regression guarded: every run on one day dealt the same first shop, because the shops were seeded with the date.
+    const other = play(NO_RUN, begun("troy"), runRead("troy"));
+    expect(shelfOf(other)).not.toEqual(shelfOf(shopping()));
+  });
+
+  it("buys one more board slot for 4 gold, and refuses a second it can't afford", () => {
+    const next = runReducer(shopping(), { type: "buy-slot" });
+    const run = sceneOf(next.phase).run!;
+    expect(run.gold).toBe(0);
+    expect(run.bought).toBe(1);
+    expect(runReducer(next, { type: "buy-slot" })).toBe(next);
+  });
+
+  it("sells the last card on the board for its price, so a player can sell everything for one better card", () => {
+    // Regression guarded: the Archive refused the last card ("Keep one").
+    const next = runReducer(shopping(), { type: "move", id: ace, spot: { kind: "archive" } });
+    const run = sceneOf(next.phase).run!;
+    expect(run.units).toHaveLength(0);
+    expect(run.gold).toBeGreaterThan(4);
+  });
+
+  it("moves a creature to a free cell, and trades cells with one standing on a taken cell", () => {
+    const two = runReducer(shopping(), { type: "buy", slot: 0 });
+    const [first, second] = sceneOf(two.phase).run!.units;
+    const moved = runReducer(two, { type: "move", id: ace, spot: { kind: "cell", col: 3, row: 1 } });
+    expect(sceneOf(moved.phase).run!.units[0]).toMatchObject({ col: 3, row: 1 });
+    const traded = runReducer(two, { type: "move", id: ace, spot: { kind: "cell", col: second.col, row: second.row } });
+    const [a, b] = sceneOf(traded.phase).run!.units;
+    expect([a.col, a.row, b.col, b.row]).toEqual([second.col, second.row, first.col, first.row]);
+  });
 });
 
 describe("a round", () => {
