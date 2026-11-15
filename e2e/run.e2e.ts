@@ -131,6 +131,25 @@ async function expectNear(page: Page, fullName: string, target: Spot) {
   }).toBeLessThan(30);
 }
 
+// The one test every PR runs (CI's play-screen job, `--grep @smoke`): the 3D board starts,
+// a buy lands, a drag lands on the cell it was dropped on, and a round is fought and left.
+// The rules behind each step are unit tests (src/lib/run-state.test.ts, src/lib/run-reads.test.ts,
+// src/components/run/run-screens.test.tsx); the rest of this file runs nightly (.github/workflows/e2e-nightly.yml).
+test("a round plays from the shop to the next round @smoke", async ({ page }) => {
+  await startRun(page);
+  const name = await buyCheapest(page);
+  expect(name).not.toBeNull();
+  await expect(page.getByLabel("2 of 2 cards on the board").locator("visible=true")).toBeVisible();
+  await settled(page);
+  await drag(page, (await unitSpot(page, name!))!, await cellSpot(page, 2, 1));
+  await expectAt(page, name!, 2, 1);
+  await page.getByRole("button", { name: "Fight" }).locator("visible=true").click();
+  await page.getByRole("button", { name: "Skip" }).click();
+  await expect(page.getByText(/^Round 1 (won|lost)$|^A draw$/)).toBeVisible();
+  await page.getByRole("button", { name: "Continue" }).click();
+  await expect(page.getByText("Round 2", { exact: true })).toBeVisible({ timeout: 30_000 });
+});
+
 test("a bought card goes onto the board while it has room, then to the Drafts shelf", async ({ page }) => {
   await startRun(page);
   const name = await buyCheapest(page);

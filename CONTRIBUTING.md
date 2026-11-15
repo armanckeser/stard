@@ -34,7 +34,12 @@ npm run lint          # eslint
 npm test              # vitest
 npm run build         # tsc -b && vite build
 npm run build:cli     # the npx package: the app built with VITE_LOCAL=1 + the CLI, into cli/dist
+npx playwright test --grep @smoke   # one round of Play in a real browser, as every PR runs it
+npm run test:e2e      # every Play browser test (about 10 minutes); CI runs these nightly
 ```
+
+A rule of the game belongs in a unit test (`src/lib/run-state.test.ts` and its neighbours),
+not a browser test: CI keeps one browser test per PR, so it finishes in about a minute and a half.
 
 To try List and unstar writes without touching a real account, run the fake GitHub in
 `scripts/fake-github.ts` and point either server at it:
