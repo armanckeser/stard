@@ -379,3 +379,12 @@ Everything the owner said while the Play run was built, in one place. Status: **
 | "When I see something like rate limited, I want to press the character and see what rate limited means." In a fight, a tap on any creature (or on its condition badge) opens a panel beside the board, as TFT's unit panel does, and the fight plays on: live HP and shield, the condition as a sentence with the seconds left ("Rate limited: acts 1.5× slower, 2 s left"), the ability, and live set bonuses (GAME-UI §9). | branch `fight-inspect` (#102) |
 
 The owner played a whole run on 2026-11-12: "it was actually fun".
+
+### Added 2026-11-15, decks and the customize step
+
+> "I feel its better if people can have many lists lists that they already have and switch playstyles basically when they want fo easily. We shouldn't just pull from the deck obviously but percentage chance wise it should have an effect so people can't just create op decks."
+
+| Feedback | Status |
+|---|---|
+| A deck is any of the player's public GitHub Lists, switched at a run's end ("Next run's deck"). It fills at most half of the 40-card pool; the stars draw skips the List's other repos, so a strong List can't take more. A short pool tops up from popular repos as before. | branch `deck-from-list` |
+| After the first run, **Customize your team** replaces Copy team link: character, ace and deck, kept in the browser and carried in team links. One quiet line offers `npx github-stars-organizer` to save them to the `stard` repo. Not called "make it permanent". | open |

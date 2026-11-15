@@ -1,12 +1,13 @@
 import { useEffect, useRef, useState } from "react";
-import { Check, Link2, RotateCcw, Swords } from "lucide-react";
+import { Check, Layers, Link2, RotateCcw, Swords } from "lucide-react";
 import { StarStard } from "@/components/star-stard";
 import { TeamTiles } from "@/components/run/team-tiles";
 import { Input } from "@/components/ui/input";
 import { beatLine, beatenIn, challengeLink, challengeMessage, type RoundResult } from "@/lib/challenge";
+import { chooseDeck, deckFor } from "@/lib/deck";
 import { countEvent } from "@/lib/events";
 import { APP_URL, validLogin } from "@/lib/published-list";
-import { WINS_TO_FINISH, type Unit } from "@/lib/run";
+import { WINS_TO_FINISH, type DeckChoice, type Unit } from "@/lib/run";
 import { recordOf, saveTeam, teamLink } from "@/lib/saved-team";
 import type { Snapshot } from "../../../server/run/types";
 
@@ -24,8 +25,12 @@ const COPIED_FOR = 1500;
  * to beat that team. The Worker plays the run's fights again before it hands back the
  * team's link (worker/src/team.ts).
  */
-export function RunEnd({ login, seed, rounds, results, team, wins, losses, against, onNewRun }: {
+export function RunEnd({ login, deck, decks, seed, rounds, results, team, wins, losses, against, onNewRun }: {
   login: string;
+  /** The List this run's pool leaned on, if any. */
+  deck?: string;
+  /** The player's public Lists, to pick the next run's deck from. */
+  decks: DeckChoice[];
   /** The run's seed, which the Worker replays the fights with. */
   seed: string;
   /** The team as fought at each round, round 1 first. */
@@ -43,13 +48,13 @@ export function RunEnd({ login, seed, rounds, results, team, wins, losses, again
   useEffect(() => {
     let live = true;
     setSaving({ state: "saving" });
-    saveTeam(login, seed, rounds, against)
+    saveTeam(login, seed, rounds, against, deck)
       .then(({ token }) => live && setSaving({ state: "saved", link: teamLink(token) }))
       .catch((cause: unknown) => live && setSaving({ state: "failed", message: cause instanceof Error && cause.message !== "Failed to fetch" ? cause.message : "The team couldn't be saved." }));
     return () => {
       live = false;
     };
-  }, [login, seed, rounds, against]);
+  }, [login, seed, rounds, against, deck]);
   const beaten = beatenIn(results);
   const lead = beatLine(beaten);
   const newRun = <button type="button" className="hud-button run-panel-link" onClick={onNewRun}><RotateCcw className="size-4" /> New run</button>;
@@ -76,8 +81,39 @@ export function RunEnd({ login, seed, rounds, results, team, wins, losses, again
         {saving.state !== "failed" && newRun}
         <StarStard className="text-white/55 hover:text-white" />
       </div>
+      <DeckPick login={login} played={deck} decks={decks} />
       {saving.state === "failed" && <p className="run-panel-note text-center" role="alert">{saving.message} The link opens the Play screen instead.</p>}
     </section>
+  );
+}
+
+/**
+ * The next run's deck: all the player's stars, or one of their public Lists, which then
+ * deals up to half the shop (worker/src/battle.ts). Kept in this browser (src/lib/deck.ts).
+ */
+function DeckPick({ login, played, decks }: { login: string; played?: string; decks: DeckChoice[] }) {
+  const [picked, setPicked] = useState(() => deckFor(login) ?? "");
+  if (decks.length === 0) {
+    return (
+      <p className="run-panel-note text-center">
+        Play a playstyle: make a public List of your stars on GitHub, and it becomes a deck here.{" "}
+        <a className="underline underline-offset-4 hover:text-white" href={`https://github.com/${login}?tab=stars`} target="_blank" rel="noopener noreferrer">Your stars</a>
+      </p>
+    );
+  }
+  const pick = (slug: string) => {
+    setPicked(slug);
+    chooseDeck(login, slug || undefined);
+  };
+  return (
+    <label className="run-deck">
+      <Layers className="size-4" aria-hidden="true" />
+      <span>{picked === (played ?? "") ? "Deck" : "Next run's deck"}</span>
+      <select value={picked} onChange={(event) => pick(event.target.value)}>
+        <option value="">All stars</option>
+        {decks.map((choice) => <option key={choice.slug} value={choice.slug}>{choice.name}</option>)}
+      </select>
+    </label>
   );
 }
 
