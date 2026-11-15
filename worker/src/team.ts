@@ -132,7 +132,7 @@ async function saveTeam(body: Record<string, unknown>, deps: RunDeps, key: strin
     const number = i + 1;
     if (wins >= WINS_TO_FINISH || losses >= LOSSES_TO_END) throw new RunRefused(`The run was over before round ${number}.`, REFUSED);
     const checked = checkedRound(player.team, player.login, round, number, rounds.at(-1)?.boosts ?? []);
-    const mine: Snapshot = { login: player.login, round: number, units: checked.units.map((unit) => ({ card: player.team[unit.fighter].card, col: unit.col, row: unit.row })), boosts: checked.boosts };
+    const mine: Snapshot = { login: player.login, round: number, units: checked.units.map((unit) => ({ card: player.team[unit.fighter].card, col: unit.col, row: unit.row })), boosts: checked.boosts, klass: look?.klass ?? player.character.klass };
     const opponent = await opponentAt(player.login, number, seed, against, deps.read, optedOut);
     const winner = winnerOf(fight(mine, opponent.snapshot, fightSeed(player.login, opponent.login, number, seed)));
     if (winner === 0) wins++;

@@ -43,6 +43,7 @@ export function savedSnapshotAt(saved: SavedTeam, round: number): Snapshot {
     round,
     units: savedUnitsAt(saved, round).map((unit) => ({ card: unit.fighter.card, col: unit.col, row: unit.row })),
     boosts: roundOf(saved, round).boosts,
+    klass: saved.character.klass,
   };
 }
 
