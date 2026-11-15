@@ -39,6 +39,8 @@ describe("popOf", () => {
     ["boost:tar-pit", { kind: "boost", name: "Tar pit", line: "3rd hit → Foe speed down" }],
     ["boost:last-stand", { kind: "boost", name: "Last stand", line: "Alone → Attack up" }],
     ["boost:throttle", { kind: "boost", name: "Throttle", line: "Start → Rate limited" }],
+    ["class:archivist", { kind: "class", name: "Archivist", line: "Ally down → Heal" }],
+    ["class:collector", { kind: "class", name: "Collector", line: "Start → Attack up" }],
   ])("reads %s as its trigger and first effect", (id, pop) => {
     expect(popOf(id)).toEqual(pop);
   });

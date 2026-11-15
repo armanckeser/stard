@@ -5,6 +5,8 @@
 // side 0 (y 1 is its front), y 2 and 3 to side 1 (y 2 is its front). Each side
 // counts columns from its own left, so side 1's columns are mirrored on the board.
 
+import type { ClassId } from "../character.ts";
+
 export const COLS = 4;
 export const ROWS = 2;
 /** One tick of a fight, in milliseconds. Event times are in ticks. */
@@ -30,8 +32,8 @@ export type Card = {
 
 export type Placed = { card: Card; col: number; row: number };
 
-/** A team as saved at one round of a run: which cards, and where each stands. */
-export type Snapshot = { login: string; round: number; units: Placed[]; boosts: string[] };
+/** A team as saved at one round of a run: which cards, and where each stands. `klass` is its player's class (classes.ts). */
+export type Snapshot = { login: string; round: number; units: Placed[]; boosts: string[]; klass?: ClassId };
 
 export type Side = 0 | 1;
 

@@ -1,5 +1,7 @@
 import { seededRandom } from "../battle.ts";
+import type { ClassId } from "../character.ts";
 import { abilityHooks } from "./abilities.ts";
+import { classHooks } from "./classes.ts";
 import { fightWith } from "./fight.ts";
 import type { Effect, Hook, Rules, Trigger } from "./hooks.ts";
 import { winnerOf } from "./rules.ts";
@@ -113,6 +115,33 @@ export function strengthOf(trial: Trial, fights: number, seed: string): number {
     const a: Snapshot = { login: "a", round: size, units: placed(mine, random), boosts: [] };
     const b: Snapshot = { login: "b", round: size, units: placed(theirs, random), boosts: [] };
     const fightSeed = `${seed}|${i}`;
+    gained += Number(winnerOf(on(a, b, fightSeed)) === 0) - Number(winnerOf(off(a, b, fightSeed)) === 0);
+  }
+  return (gained / fights) * 100;
+}
+
+/** Every card's ability, plus its player's class when `withClass`. */
+const classRules = (withClass: boolean): Rules => ({
+  hooks: (snapshot) => {
+    const klass = withClass ? classHooks(snapshot) : snapshot.units.map(() => []);
+    return snapshot.units.map((unit, index) => [...abilityHooks(unit.card.ability), ...klass[index]]);
+  },
+});
+
+/**
+ * Win-rate points a class adds: side 0 plays `klass` in `fights` fights of STRENGTH_TEAM
+ * cards a side drawn from `cards`, less the same fights without it.
+ */
+export function classStrengthOf(klass: ClassId, cards: Card[], fights: number): number {
+  const random = seededRandom(`class strength|${klass}`);
+  const on = fightWith(classRules(true));
+  const off = fightWith(classRules(false));
+  let gained = 0;
+  for (let i = 0; i < fights; i++) {
+    const taken = new Set<string>();
+    const a: Snapshot = { login: "a", round: STRENGTH_TEAM, units: placed(draw(cards, STRENGTH_TEAM, taken, random), random), boosts: [], klass };
+    const b: Snapshot = { login: "b", round: STRENGTH_TEAM, units: placed(draw(cards, STRENGTH_TEAM, taken, random), random), boosts: [] };
+    const fightSeed = `${klass}|${i}`;
     gained += Number(winnerOf(on(a, b, fightSeed)) === 0) - Number(winnerOf(off(a, b, fightSeed)) === 0);
   }
   return (gained / fights) * 100;

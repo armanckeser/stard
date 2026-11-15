@@ -43,4 +43,9 @@ describe("saved team by round", () => {
     // Regression guarded: a challenger's 7th round, past a 3-round saved run, meeting an empty team.
     expect(savedUnitsAt(saved, 7).map((unit) => [unit.fighter.fullName, unit.col, unit.row])).toEqual([["greendale/annie", 0, 0], ["greendale/abed", 2, 1]]);
   });
+
+  it("fights with the class the team was saved with", () => {
+    // Regression guarded: a team link replayed without its class, so "Beat this team" met a weaker team than the one that won.
+    expect(savedSnapshotAt({ ...saved, character: { ...saved.character, klass: "scout" } }, 1).klass).toBe("scout");
+  });
 });

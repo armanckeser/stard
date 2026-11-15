@@ -235,7 +235,6 @@ Ideas and open items from the design conversations that the sections above don't
 **Characters**
 
 - Character level from followers and own stars exists; let it unlock looks (hats, jackets) and not strength.
-- Class perks are small stat bumps today. Give each class one thing it can do in a match instead (a Scout sees one of the other team's draws, an Archivist can field archived repos at full strength).
 - The 3D character in the builder, turning as the choices change.
 
 **Matches**
@@ -388,4 +387,4 @@ The owner played a whole run on 2026-11-12: "it was actually fun".
 |---|---|
 | A deck is any of the player's public GitHub Lists, switched at a run's end ("Next run's deck"). It fills at most half of the 40-card pool; the stars draw skips the List's other repos, so a strong List can't take more. A short pool tops up from popular repos as before. | branch `deck-from-list` |
 | After the first run, **Customize your team** replaces Copy team link: the character's class and look, the ace and the deck, kept in the browser and carried in team links. A name and a motto stay with the player's GitHub: the demo has no sign-in, so a team link saved under someone's username can't carry words they never wrote. One quiet line points to `npx github-stars-organizer` for the README card. Not called "make it permanent". | branch `customize-team` |
-| Class perks ("Cards under 1,000 stars are 15% stronger") apply only to the old instant battle: a run's cards are worked out without the class (`cardFor`), yet the Play screen's profile and the Customize sheet show the perk. | open: give classes a run effect or stop showing the perk in Play |
+| Class perks ("Cards under 1,000 stars are 15% stronger") apply only to the old instant battle: a run's cards are worked out without the class (`cardFor`), yet the Play screen's profile and the Customize sheet show the perk. | Each class has one run effect, built like a boost (`server/run/classes.ts`): Maintainer, the first card starts with a shield of 8% of its HP; Scout, 1- and 2-gold cards hit 25% harder; Collector, every card hits 3% harder for each family on the team; Specialist, the biggest family hits 20% harder; Veteran, 10% more guard; Archivist, teammates heal 3% when a card faints. Each wins +5 to +9 win-rate points over 2,000 fights of random 4-card teams (`class-strength.test.ts`; measured 6.0 to 7.9); a set at 2 cards is +8 to +14. Opponents fight with their own class, and a team link with the class it was saved with. The instant Battle screen keeps its old perks. | #129, branch `class-run-effects` |

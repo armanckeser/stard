@@ -1,4 +1,5 @@
 import type { Fighter } from "../../server/battle.ts";
+import type { ClassId } from "../../server/character.ts";
 import { BOOST_ROUNDS, boostOffer } from "../../server/run/boosts.ts";
 import { fight as runFight } from "../../server/run/fight.ts";
 import {
@@ -76,6 +77,8 @@ type RunState = {
   results: Result[];
   /** The saved team every round is played against, when the run was started from a share link. */
   against: SavedTeam | null;
+  /** The player's class when the run started; a run begun before classes had a run effect has none. */
+  klass?: ClassId;
 };
 
 type RunView = {
@@ -195,7 +198,7 @@ export async function opponentAt(login: string, round: number, seed: string, aga
   }
   const opponent = await read(opponentLogin(login, round, seed, optedOut));
   const units = opponentUnits(opponent, round, seed);
-  const snapshot: Snapshot = { login: opponent.login, round, units: units.map((unit): Placed => ({ card: cardOf(unit.fighter), col: unit.col, row: unit.row })), boosts: [] };
+  const snapshot: Snapshot = { login: opponent.login, round, units: units.map((unit): Placed => ({ card: cardOf(unit.fighter), col: unit.col, row: unit.row })), boosts: [], klass: opponent.character.klass };
   return { login: opponent.login, avatarUrl: opponent.avatarUrl, character: opponent.character, fighters: units.map((unit) => unit.fighter), snapshot };
 }
 
@@ -291,7 +294,7 @@ function place(state: RunState, card: number, col: number, row: number): RunStat
 // The opponent is picked from the accounts that haven't opted out, so an opted-out account is never read here.
 async function playRound(state: RunState, deps: RunDeps, optedOut: readonly string[]): Promise<{ state: RunState; report: FightReport }> {
   const opponent = await opponentAt(state.login, state.round, state.seed, state.against ?? null, deps.read, optedOut);
-  const mine: Snapshot = { login: state.login, round: state.round, units: state.team.map((member): Placed => ({ card: state.pool[member.card], col: member.col, row: member.row })), boosts: state.boosts };
+  const mine: Snapshot = { login: state.login, round: state.round, units: state.team.map((member): Placed => ({ card: state.pool[member.card], col: member.col, row: member.row })), boosts: state.boosts, klass: state.klass };
   const seed = fightSeed(state.login, opponent.login, state.round, state.seed);
   const events = fight(mine, opponent.snapshot, seed);
   const winner = winnerOf(events);
@@ -368,6 +371,7 @@ async function newRun(body: Record<string, unknown>, deps: RunDeps, key: string)
     offer: [],
     results: [],
     against,
+    klass: player.character.klass,
   };
   const state: RunState = { ...start, shop: shopAt(start, 1, 0) };
   return {

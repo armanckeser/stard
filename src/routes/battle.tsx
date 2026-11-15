@@ -102,7 +102,7 @@ function TeamRow({ team, onInspect, delay }: { team: Team; onInspect: (fighter: 
             <span className="text-muted-foreground"> · @{team.login}</span>
           </p>
           <p className="truncate text-xs text-muted-foreground">
-            {team.character.klass === "rookie" ? `${SOURCE[team.source]}.` : `${klass.perk} ${SOURCE[team.source]}.`}
+            {team.character.klass === "rookie" ? `${SOURCE[team.source]}.` : `${klass.battlePerk} ${SOURCE[team.source]}.`}
           </p>
           {team.character.motto && <p className="truncate text-xs text-muted-foreground">“{team.character.motto}”</p>}
         </div>

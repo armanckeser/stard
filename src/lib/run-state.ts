@@ -268,9 +268,9 @@ function placed(building: Building, moving: Unit, col: number, row: number): Bui
 function fought(phase: Extract<Phase, { kind: "shop" }>, seed: string): Phase {
   const { run, round } = phase;
   const fightSeed = `${run.player.login}|${round.opponent.login}|${round.number}|${seed}`;
-  const mine = snapshot(run.player.login, round.number, run.units, run.boosts);
+  const mine = snapshot(run.player.login, round.number, run.units, run.boosts, run.player.character.klass);
   // A saved team fights with the boosts it had at that round, as the Worker replays it (worker/src/team.ts).
-  const theirs = run.against ? savedSnapshotAt(run.against, round.number) : snapshot(round.opponent.login, round.number, round.theirs);
+  const theirs = run.against ? savedSnapshotAt(run.against, round.number) : snapshot(round.opponent.login, round.number, round.theirs, [], round.opponent.character.klass);
   const events = playFight(mine, theirs, fightSeed);
   const winner = winnerOf(events);
   const result: RoundResult = { round: round.number, opponent: round.opponent.login, outcome: winner === 0 ? "won" : winner === 1 ? "lost" : "draw" };

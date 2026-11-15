@@ -1,4 +1,6 @@
+import { CLASSES, isClass } from "../character.ts";
 import { abilityById } from "./abilities.ts";
+import { CLASS_EFFECTS } from "./classes.ts";
 import { boostById } from "./boosts.ts";
 import { DEPRECATED_EVERY, deprecatedLoss, FLAKY_ODDS, MERGE_CONFLICT_ODDS, RATE_LIMITED, type Condition, type Effect, type Gate, type Stat, type Trigger } from "./hooks.ts";
 import { bonusOf } from "./sets.ts";
@@ -54,7 +56,7 @@ const SET_NAMES: Record<string, string> = {
 /** A set as written on a card: "systems" is Systems, "cli" is CLI. */
 export const setName = (set: string) => SET_NAMES[set] ?? set.charAt(0).toUpperCase() + set.slice(1);
 
-export type Source = { kind: "ability" | "set" | "boost" | "condition"; name: string };
+export type Source = { kind: "ability" | "set" | "boost" | "class" | "condition"; name: string };
 
 /** What an event's `ability` or `cause` is, in words. An unknown id comes back as written. */
 export function sourceOf(id: string): Source {
@@ -64,6 +66,10 @@ export function sourceOf(id: string): Source {
   if (id.startsWith("boost:")) {
     const boost = id.slice("boost:".length);
     return { kind: "boost", name: boostById(boost)?.name ?? boost };
+  }
+  if (id.startsWith("class:")) {
+    const klass = id.slice("class:".length);
+    return { kind: "class", name: isClass(klass) ? CLASSES[klass].label : klass };
   }
   if (id in CONDITION_NAMES) return { kind: "condition", name: CONDITION_NAMES[id as Condition] };
   return { kind: "ability", name: abilityById(id)?.name ?? id };
@@ -83,7 +89,7 @@ function effectWords(effect: Effect): string {
   if (effect.kind === "heal") return `heal${reach}`;
   if (effect.kind === "condition") return CONDITION_NAMES[effect.condition];
   const whose = effect.aim === "self" ? "" : effect.aim.endsWith("foe") || effect.aim === "foes" ? "foe " : "team ";
-  return `${whose}${STAT_WORDS[effect.stat]} ${effect.by > 0 ? "up" : "down"}`;
+  return `${whose}${STAT_WORDS[effect.stat]} ${effect.by < 0 ? "down" : "up"}`;
 }
 
 /**
@@ -107,5 +113,13 @@ export const effectsOf = (id: string): Effect[] => hookOf(id)?.effects ?? [];
 function hookOf(id: string): { on: Trigger; when?: Gate; effects: Effect[] } | null {
   if (id.startsWith("set:")) return bonusOf(id.slice("set:".length)).tiers[0];
   if (id.startsWith("boost:")) return boostById(id.slice("boost:".length)) ?? null;
+  if (id.startsWith("class:")) return classHookOf(id.slice("class:".length));
   return abilityById(id) ?? null;
+}
+
+/** A class's hook as words read it; an effect that depends on the team is read for an empty one. */
+function classHookOf(klass: string): { on: Trigger; effects: Effect[] } | null {
+  const effect = klass in CLASS_EFFECTS ? CLASS_EFFECTS[klass as keyof typeof CLASS_EFFECTS] : undefined;
+  if (!effect) return null;
+  return { on: effect.on, effects: typeof effect.effects === "function" ? effect.effects({ login: "", round: 0, units: [], boosts: [] }) : effect.effects };
 }

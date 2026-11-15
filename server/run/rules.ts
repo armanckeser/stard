@@ -1,4 +1,5 @@
 import { seededRandom, type Fighter } from "../battle.ts";
+import type { ClassId } from "../character.ts";
 import { BUDGET, HP_FLOOR, roleOf } from "./stats.ts";
 import { COLS, ROWS, type Card, type FightEvent, type Side, type Snapshot } from "./types.ts";
 
@@ -43,7 +44,7 @@ export const priceOf = (rarity: Card["rarity"]) => rarity + 1;
 export const costOf = (fighter: RunFighter) => priceOf(fighter.card.rarity);
 
 /** A team as the fight reads it. `boosts` are the ids picked so far in the run (server/run/boosts.ts). */
-export const snapshot = (login: string, round: number, units: Unit[], boosts: string[] = []): Snapshot => ({ login, round, units: units.map((unit) => ({ card: unit.fighter.card, col: unit.col, row: unit.row })), boosts });
+export const snapshot = (login: string, round: number, units: Unit[], boosts: string[] = [], klass?: ClassId): Snapshot => ({ login, round, units: units.map((unit) => ({ card: unit.fighter.card, col: unit.col, row: unit.row })), boosts, klass });
 
 export function shuffled<T>(items: T[], seed: string): T[] {
   const random = seededRandom(seed);
