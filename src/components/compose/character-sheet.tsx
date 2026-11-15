@@ -34,12 +34,22 @@ export function CharacterSheet({
   login,
   character,
   onChange,
+  title = "Your character",
+  description = "Stands behind your cards in a battle. The character lives in your README, in the address of its card.",
+  words = true,
+  children,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   login: string;
   character: Character;
   onChange: (character: Character) => void;
+  title?: string;
+  description?: string;
+  /** Offers the name and motto. The Play screen leaves them to the player's GitHub (worker/src/team.ts). */
+  words?: boolean;
+  /** More choices, after the character's. */
+  children?: React.ReactNode;
 }) {
   const isDesktop = useIsDesktop();
   const klass = CLASSES[character.klass];
@@ -63,8 +73,8 @@ export function CharacterSheet({
         className={isDesktop ? "overflow-y-auto sm:max-w-md" : "max-h-[88dvh] overflow-y-auto overscroll-contain rounded-t-2xl pb-[env(safe-area-inset-bottom,0px)]"}
       >
         <SheetHeader>
-          <SheetTitle className="font-display text-lg">Your character</SheetTitle>
-          <SheetDescription>Stands behind your cards in a battle. The character lives in your README, in the address of its card.</SheetDescription>
+          <SheetTitle className="font-display text-lg">{title}</SheetTitle>
+          <SheetDescription>{description}</SheetDescription>
         </SheetHeader>
         <div className="space-y-6 px-4 pb-6">
           <div className="flex items-center gap-4 rounded-lg p-3" style={{ background: `${klass.color}33` }}>
@@ -79,7 +89,9 @@ export function CharacterSheet({
             </div>
           </div>
 
-          <div className="grid gap-3">
+          {children}
+
+          {words && <div className="grid gap-3">
             <div className="space-y-1.5">
               <Label htmlFor="character-name">Name</Label>
               <Input id="character-name" value={character.name === login ? "" : character.name} placeholder={login || "Your username"} maxLength={MAX_NAME} onChange={(e) => onChange({ ...character, name: e.target.value || login })} />
@@ -88,7 +100,7 @@ export function CharacterSheet({
               <Label htmlFor="character-motto">Motto</Label>
               <Input id="character-motto" value={character.motto} placeholder="A line for your card (optional)" maxLength={MAX_MOTTO} onChange={(e) => onChange({ ...character, motto: e.target.value })} />
             </div>
-          </div>
+          </div>}
 
           <fieldset className="space-y-2">
             <legend className="mb-2 text-xs font-medium uppercase tracking-wider text-muted-foreground">Class</legend>

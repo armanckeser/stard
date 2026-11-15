@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { Fighter } from "../../server/battle.ts";
-import { defaultCharacter } from "../../server/character.ts";
+import { defaultCharacter, defaultLook, encodeLook } from "../../server/character.ts";
 import { OPPONENTS, type RunFighter } from "../../server/run/rules.ts";
 import { rarityOf } from "../../server/run/stats.ts";
 import type { Card } from "../../server/run/types.ts";
@@ -126,12 +126,24 @@ describe("POST /api/run/team", () => {
     const decks: (string | undefined)[] = [];
     const deps = depsFor({ [PLAYER]: STRONG });
     const read = deps.read;
-    deps.read = (login, deck) => (login === PLAYER && decks.push(deck), read(login, deck));
+    deps.read = (login, choice) => (login === PLAYER && decks.push(choice?.deck), read(login, choice));
     const { status } = await post({ login: PLAYER, deck: "web-tools", rounds: Array.from({ length: 5 }, () => aceOnly()) }, deps);
 
     expect(status).toBe(200);
     expect(decks).toEqual(["web-tools"]);
     expect((await post({ login: PLAYER, deck: "not a slug", rounds: [aceOnly()] }, deps)).status).toBe(400);
+  });
+
+  it("keeps the class and look picked in the Play screen, and never a name or motto from the browser", async () => {
+    // Regression guarded: the demo has no sign-in, so a team saved under someone's username
+    // must not carry words they never wrote; a class and a look are each one of a fixed set.
+    const look = encodeLook({ ...defaultLook(PLAYER), hair: "bun" });
+    const { status, body } = await post({ login: PLAYER, look: { class: "scout", look, name: "Not Greendale", motto: "words" }, rounds: Array.from({ length: 5 }, () => aceOnly()) }, depsFor({ [PLAYER]: STRONG }));
+
+    expect(status).toBe(200);
+    const saved = (await read(body.token, depsFor({}))).body as unknown as { character: { name: string; motto: string; klass: string; look: { hair: string } } };
+    expect(saved.character).toMatchObject({ name: PLAYER, motto: "", klass: "scout", look: { hair: "bun" } });
+    expect((await post({ login: PLAYER, look: { class: "wizard", look }, rounds: [aceOnly()] }, depsFor({}))).status).toBe(400);
   });
 
   it("freezes each card's numbers as the Worker read them, and reads the same team back a week later", async () => {

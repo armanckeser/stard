@@ -1,3 +1,4 @@
+import { encodeLook } from "../../server/character";
 import { savedUnitsAt, type SavedTeam } from "../../server/run/saved-team";
 import type { Snapshot } from "../../server/run/types";
 import { APP_URL, CARD_ORIGIN } from "./published-list";
@@ -17,10 +18,13 @@ async function answered<T>(response: Response, otherwise: string): Promise<T> {
 /**
  * Saves the team a run fought with at each round. `seed` is the run's (newRunSeed), so
  * the Worker meets the same opponents when it replays the fights. `against` is the
- * saved team's token when the run was played against one, and `deck` the List its pool leaned on.
+ * saved team's token when the run was played against one. The player's pool choice and
+ * character's class and look go with it, so the Worker replays the same pool and the link
+ * shows the character the run was played with.
  */
-export async function saveTeam(login: string, seed: string, rounds: Snapshot[], against?: string, deck?: string): Promise<{ token: string; team: SavedTeam }> {
-  const body = { login, seed, against, deck, rounds: rounds.map((round) => ({ units: round.units.map((unit) => ({ repo: unit.card.fullName, col: unit.col, row: unit.row })), boosts: round.boosts })) };
+export async function saveTeam(player: Player, seed: string, rounds: Snapshot[], against?: string): Promise<{ token: string; team: SavedTeam }> {
+  const { login, choice, character } = player;
+  const body = { login, seed, against, ...choice, look: { class: character.klass, look: encodeLook(character.look) }, rounds: rounds.map((round) => ({ units: round.units.map((unit) => ({ repo: unit.card.fullName, col: unit.col, row: unit.row })), boosts: round.boosts })) };
   const response = await fetch(`${CARD_ORIGIN}/api/run/team`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
   return answered(response, "The team couldn't be saved.");
 }

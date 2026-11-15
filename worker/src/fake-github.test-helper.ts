@@ -74,7 +74,7 @@ const ACCOUNTS: Record<string, Account> = {
     stars: ["cougar-town/kickpuncher", "inspector-spacetime/constables", "troy-barnes/blanket-fort"],
   },
   // No README: the default character, the ace from a pinned repo, only two stars.
-  [GUEST]: { readme: null, pinned: ["greendale/paintball-assassin"], stars: ["city-college/mascot", "greendale/human-being"] },
+  [GUEST]: { readme: null, pinned: ["greendale/paintball-assassin", "city-college/mascot"], stars: ["city-college/mascot", "greendale/human-being"] },
   [LISTED]: { readme: null, pinned: ["troy-barnes/blanket-fort"], stars: [] },
   [LISTED_LEFT_OUT]: { readme: "# Dean", pinned: ["greendale/human-being"], stars: [], noPlay: true },
   [OWN_FILE]: { readme: "# Shirley", pinned: ["greendale/human-being"], stars: [], characterFile: "name: Shirley\nhair: medium\nglasses: square\nhat: beanie" },

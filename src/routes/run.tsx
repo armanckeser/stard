@@ -18,7 +18,7 @@ import { useMediaQuery } from "@/hooks/use-media-query";
 import { RunEnd } from "@/components/run/run-end";
 import { Shop } from "@/components/run/shop";
 import { demoUser } from "@/lib/demo";
-import { chooseDeck, deckFor } from "@/lib/deck";
+import { choicesFor, pickFor } from "@/lib/choices";
 import { countEvent } from "@/lib/events";
 import { validLogin } from "@/lib/published-list";
 import { LOSSES_TO_END, NEW_TALLY, REROLL_COST, ROUND_GOLD, WINS_TO_FINISH, WIN_GOLD, costOf, fetchOpponent, fetchPlayer, newRunSeed, opponentUnits, rangeOf, type Player, type RunFighter, type Unit } from "@/lib/run";
@@ -114,25 +114,30 @@ async function readRun(login: string, seed: string, againstToken: string | undef
   try {
     // Round 1's opponent is known from the name and the seed alone, so both teams are read at once.
     if (!againstToken) fetchOpponent(login, 1, seed).catch(() => {});
-    const [player, against] = await Promise.all([playerWithDeck(login), againstToken ? openTeam(againstToken) : null]);
+    const [player, against] = await Promise.all([playerFor(login), againstToken ? openTeam(againstToken) : null]);
     return { type: "run-read", seed, player, against, ...(await readRound(player, 1, seed, against)) };
   } catch (cause) {
     return { type: "read-failed", seed, message: messageOf(cause, "The cards couldn't be read. Check the connection and try again.") };
   }
 }
 
-/** The player's cards, leaning on the deck picked in this browser. A deck that is gone (the List deleted or made private) is let go, and the run uses all their stars. */
-async function playerWithDeck(login: string): Promise<Player> {
-  const deck = deckFor(login);
-  if (!deck) return fetchPlayer(login);
+/**
+ * The player as picked in this browser's Customize sheet: their cards dealt with the deck
+ * and ace, and their character in the class and look. A deck that is gone (the List deleted
+ * or made private) is let go, and the run uses all their stars.
+ */
+async function playerFor(login: string): Promise<Player> {
+  const { deck, ace, klass, look } = choicesFor(login);
+  let player: Player;
   try {
-    return await fetchPlayer(login, undefined, deck);
+    player = await fetchPlayer(login, undefined, { deck, ace });
   } catch (cause) {
     // Any other failure (the network, GitHub) keeps the pick for the next try.
-    if (!(cause instanceof Error && cause.message.includes("no public List"))) throw cause;
-    chooseDeck(login, undefined);
-    return fetchPlayer(login);
+    if (!deck || !(cause instanceof Error && cause.message.includes("no public List"))) throw cause;
+    pickFor(login, { deck: undefined });
+    player = await fetchPlayer(login, undefined, { ace });
   }
+  return { ...player, character: { ...player.character, ...(klass ? { klass } : {}), ...(look ? { look } : {}) } };
 }
 
 async function readNextRound(run: Run, number: number, seed: string): Promise<RunAction> {
@@ -371,7 +376,7 @@ function RunPage() {
 
       {phase.kind === "end" && (
         <div className="absolute inset-0 z-20 flex items-center justify-center bg-black/55 p-4">
-          <RunEnd login={phase.run.player.login} deck={phase.run.player.deck} decks={phase.run.player.decks ?? []} seed={seed} rounds={phase.run.history} results={phase.run.results} team={phase.run.units} wins={wins} losses={losses} against={phase.run.against ? search.against : undefined} onNewRun={() => start(phase.run.player.login)} />
+          <RunEnd player={phase.run.player} seed={seed} rounds={phase.run.history} results={phase.run.results} team={phase.run.units} wins={wins} losses={losses} against={phase.run.against ? search.against : undefined} onNewRun={() => start(phase.run.player.login)} />
         </div>
       )}
 
