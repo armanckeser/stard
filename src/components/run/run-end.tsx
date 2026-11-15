@@ -1,12 +1,10 @@
 import { useEffect, useRef, useState } from "react";
-import { Check, Link2, Palette, RotateCcw, Swords } from "lucide-react";
+import { Check, Link2, RotateCcw, Swords } from "lucide-react";
 import { StarStard } from "@/components/star-stard";
+import { Customize } from "@/components/run/customize";
 import { TeamTiles } from "@/components/run/team-tiles";
 import { Input } from "@/components/ui/input";
 import { beatLine, beatenIn, challengeLink, challengeMessage, type RoundResult } from "@/lib/challenge";
-import { CharacterSheet } from "@/components/compose/character-sheet";
-import { Help } from "@/components/compose/controls";
-import { choicesFor, pickFor, type Choices } from "@/lib/choices";
 import { countEvent } from "@/lib/events";
 import { APP_URL, validLogin } from "@/lib/published-list";
 import { WINS_TO_FINISH, type Player, type Unit } from "@/lib/run";
@@ -76,70 +74,12 @@ export function RunEnd({ player, seed, rounds, results, team, wins, losses, agai
         <Challenge beaten={beaten} link={saving.state === "saved" ? saving.link : null} />
       )}
       <div className="run-panel-quiet">
-        {saving.state === "failed" ? <CopyLink text={`${APP_URL}run`} label="Copy Play link" /> : <Customize player={player} />}
+        {saving.state === "failed" ? <CopyLink text={`${APP_URL}run`} label="Copy Play link" /> : <Customize login={player.login} player={player} />}
         {saving.state !== "failed" && newRun}
         <StarStard className="text-white/55 hover:text-white" />
       </div>
       {saving.state === "failed" && <p className="run-panel-note text-center" role="alert">{saving.message}</p>}
     </section>
-  );
-}
-
-/**
- * Customize your team: the character's class and look, the ace, and the deck, for the next
- * run and its team link. Kept in this browser (src/lib/choices.ts); a name and a motto stay
- * with the player's GitHub (worker/src/team.ts says why).
- */
-function Customize({ player }: { player: Player }) {
-  const { login } = player;
-  const [open, setOpen] = useState(false);
-  const [picked, setPicked] = useState(() => choicesFor(login));
-  const pick = (change: Choices) => setPicked(pickFor(login, change));
-  const character = { ...player.character, ...(picked.klass ? { klass: picked.klass } : {}), ...(picked.look ? { look: picked.look } : {}) };
-  const aces = player.aces ?? [];
-  const decks = player.decks ?? [];
-  return (
-    <>
-      <button type="button" className="hud-button run-panel-link" onClick={() => setOpen(true)}><Palette className="size-4" /> Customize your team</button>
-      <CharacterSheet
-        open={open}
-        onOpenChange={setOpen}
-        login={login}
-        character={character}
-        onChange={(next) => pick({ klass: next.klass, look: next.look })}
-        words={false}
-        title="Customize your team"
-        description="For your next run"
-      >
-        <div className="space-y-4">
-          {aces.length > 1 && (
-            <PickRow label="Ace" hint="Free card in round 1" value={picked.ace ?? ""} onPick={(ace) => pick({ ace: ace || undefined })} options={[{ value: "", label: "Your profile's pick" }, ...aces.map((name) => ({ value: name, label: name }))]} />
-          )}
-          {decks.length > 0 ? (
-            <PickRow label="Deck" hint="Up to half your shop comes from this List" value={picked.deck ?? ""} onPick={(deck) => pick({ deck: deck || undefined })} options={[{ value: "", label: "All stars" }, ...decks.map((deck) => ({ value: deck.slug, label: deck.name }))]} />
-          ) : (
-            <p className="text-sm text-muted-foreground">
-              No Lists yet ·{" "}
-              <a className="underline underline-offset-4" href={`https://github.com/${login}?tab=stars`} target="_blank" rel="noopener noreferrer">Make one on GitHub</a>
-            </p>
-          )}
-        </div>
-      </CharacterSheet>
-    </>
-  );
-}
-
-function PickRow({ label, hint, value, options, onPick }: { label: string; hint: string; value: string; options: { value: string; label: string }[]; onPick: (value: string) => void }) {
-  return (
-    <div className="space-y-1.5">
-      <div className="flex items-center gap-1">
-        <label htmlFor={`pick-${label}`} className="text-sm font-medium">{label}</label>
-        <Help label={`About ${label.toLowerCase()}`}>{hint}</Help>
-      </div>
-      <select id={`pick-${label}`} className="h-9 w-full rounded-md border bg-background px-2 text-sm" value={value} onChange={(event) => onPick(event.target.value)}>
-        {options.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
-      </select>
-    </div>
   );
 }
 

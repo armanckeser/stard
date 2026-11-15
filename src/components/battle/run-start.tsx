@@ -1,6 +1,7 @@
 import { Play } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Customize } from "@/components/run/customize";
 import { validLogin } from "@/lib/published-list";
 
 type Props = {
@@ -14,8 +15,9 @@ type Props = {
   className: string;
 };
 
-// The Play screen's start panel: one field and one button. The rules wait in How to play
-// (docs/GAME-UI.md §10). A link with ?me= starts the run with no typing.
+// The Play screen's start panel: one field and one button, with Customize your team as a
+// quiet way in to the deck, ace and character before the first run. The rules wait in How
+// to play (docs/GAME-UI.md §10). A link with ?me= starts the run with no typing.
 export function RunStart({ login, onLogin, onStart, loading, error, starting, className }: Props) {
   if (starting && !error) {
     return (
@@ -30,6 +32,9 @@ export function RunStart({ login, onLogin, onStart, loading, error, starting, cl
       <h1 className="font-display text-2xl font-bold tracking-tight">Play</h1>
       <Input value={login} onChange={(e) => onLogin(e.target.value.replace(/^@/, ""))} placeholder="Your GitHub username" aria-label="Your GitHub username" autoCapitalize="none" autoCorrect="off" spellCheck={false} />
       <Button type="submit" className="w-full" disabled={!validLogin(login) || loading}><Play /> {loading ? "Reading your stars..." : "Play"}</Button>
+      <div className="run-panel-quiet flex-col">
+        <Customize login={login.trim()} />
+      </div>
       {error && <p className="text-sm text-[#ff8f93]" role="alert">{error}</p>}
     </form>
   );
