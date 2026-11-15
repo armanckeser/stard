@@ -556,3 +556,25 @@ test("Customize your team deals the next run with the picked deck and ace, and i
   await expect.poll(() => saves.length).toBeGreaterThan(firstRun);
   expect(saves.at(-1)).toMatchObject({ deck: "web-tools", ace: secondAce, look: { class: "scout" } });
 });
+
+test("Customize your team on the Play screen deals the first run with the picked deck", async ({ page }) => {
+  // Regression guarded: a deck picked before the first run is dropped, and the run is dealt from all stars.
+  const poolChoices: string[] = [];
+  await page.route("**/api/run/pool?*", (route) => {
+    const url = new URL(route.request().url());
+    const login = url.searchParams.get("login") ?? "abed";
+    if (login !== "abed") return route.fulfill({ json: poolFor(login) });
+    poolChoices.push(url.searchParams.get("deck") ?? "");
+    return route.fulfill({ json: { ...poolFor("abed"), decks: [{ slug: "web-tools", name: "Web tools" }] } });
+  });
+  await page.goto("/run");
+  await expect(page.getByRole("button", { name: "Customize your team" })).toBeDisabled();
+  await page.getByLabel("Your GitHub username").fill("abed");
+  await page.getByRole("button", { name: "Customize your team" }).click();
+  const sheet = page.getByRole("dialog", { name: "Customize your team" });
+  await sheet.getByLabel("Deck", { exact: true }).selectOption("web-tools");
+  await page.keyboard.press("Escape");
+  await page.getByRole("button", { name: "Play", exact: true }).click();
+  await expect(page.getByLabel("1 of 2 cards on the board").locator("visible=true")).toBeVisible();
+  expect(poolChoices).toEqual(["", "web-tools"]);
+});
