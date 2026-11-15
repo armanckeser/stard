@@ -120,6 +120,20 @@ describe("POST /api/run/team", () => {
     expect(body.rounds[4]).toEqual({ units: [{ fighter: 0, col: 1, row: 0 }], boosts: [] });
   });
 
+  it("replays a run played with a deck against the same deck's cards", async () => {
+    // Regression guarded: a run whose pool leaned on a List, replayed against the pool
+    // without it, would find cards that aren't the player's and refuse the team.
+    const decks: (string | undefined)[] = [];
+    const deps = depsFor({ [PLAYER]: STRONG });
+    const read = deps.read;
+    deps.read = (login, deck) => (login === PLAYER && decks.push(deck), read(login, deck));
+    const { status } = await post({ login: PLAYER, deck: "web-tools", rounds: Array.from({ length: 5 }, () => aceOnly()) }, deps);
+
+    expect(status).toBe(200);
+    expect(decks).toEqual(["web-tools"]);
+    expect((await post({ login: PLAYER, deck: "not a slug", rounds: [aceOnly()] }, deps)).status).toBe(400);
+  });
+
   it("freezes each card's numbers as the Worker read them, and reads the same team back a week later", async () => {
     // Regression guarded: a team link that read the repos again would change the team when the repos change.
     const token = await savedStrongTeam();

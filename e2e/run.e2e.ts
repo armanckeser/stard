@@ -510,3 +510,39 @@ test("New run clears the last run's opponent, round and shop before the new run 
   await expect(page.getByText("Round 1", { exact: true })).toBeVisible();
   await expect(page.getByRole("status").filter({ hasText: "Dealing a new run..." })).toHaveCount(0);
 });
+
+test("a deck picked at a run's end deals the next run, and its team is saved with that deck", async ({ page }) => {
+  // Regression guarded: a run dealt from a List, saved without it, replays against the
+  // whole-stars pool and the Worker refuses cards that aren't in it.
+  test.setTimeout(360_000);
+  const decksRead: string[] = [];
+  const saves: { deck?: string }[] = [];
+  await page.route("**/api/run/team", (route) => {
+    if (route.request().method() !== "POST") return route.fallback();
+    saves.push(route.request().postDataJSON() as { deck?: string });
+    return route.fulfill({ json: { token: SAVED_TOKEN } });
+  });
+  await startRun(page, "", (login) => {
+    const pool = strongAbed(login);
+    return login === "abed" ? { ...pool, decks: [{ slug: "web-tools", name: "Web tools" }] } : pool;
+  });
+  await page.route("**/api/run/pool?*", (route) => {
+    const url = new URL(route.request().url());
+    const login = url.searchParams.get("login") ?? "abed";
+    const deck = url.searchParams.get("deck");
+    if (deck) decksRead.push(deck);
+    const pool = strongAbed(login);
+    return route.fulfill({ json: login === "abed" ? { ...pool, decks: [{ slug: "web-tools", name: "Web tools" }], ...(deck ? { deck } : {}) } : pool });
+  });
+  await fightToEnd(page);
+  expect(saves.at(-1)?.deck).toBeUndefined();
+
+  await page.getByLabel("Deck").selectOption("web-tools");
+  await expect(page.getByLabel("Next run's deck")).toHaveValue("web-tools");
+  await page.getByRole("button", { name: "New run" }).click();
+  await expect(page.getByLabel(/ cards on the board$/).locator("visible=true")).toBeVisible({ timeout: 30_000 });
+  expect(decksRead).toEqual(["web-tools"]);
+  await fightToEnd(page);
+  await expect.poll(() => saves.at(-1)?.deck).toBe("web-tools");
+  await expect(page.getByLabel("Deck")).toHaveValue("web-tools");
+});

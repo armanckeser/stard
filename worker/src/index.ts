@@ -118,7 +118,7 @@ export default {
     const now = Date.now();
     const pools: PoolDeps = { cache: caches.default, now, waitUntil: (work) => context.waitUntil(work), origin: url.origin, token: env.GITHUB_TOKEN, facts: env.DB ? d1FactsStore(env.DB) : undefined };
     const run = RUN_PATH.exec(url.pathname);
-    const runs: RunDeps = { key: env.BATTLE_KEY, read: (login) => cachedPool(login, pools), optedOut: optOuts, now, newSeed: newRunSeed, count, links };
+    const runs: RunDeps = { key: env.BATTLE_KEY, read: (login, deck) => cachedPool(login, pools, deck), optedOut: optOuts, now, newSeed: newRunSeed, count, links };
     if (run) return runResponse(run[1], request, runs);
     // A finished run's team: saved by replaying the run, and read back from its token.
     if (TEAM_PATH.test(url.pathname)) return teamResponse(request, url, runs);
@@ -160,7 +160,7 @@ export default {
         return json({ error: "GitHub didn't answer. Try again shortly." }, 502, 0, OPEN);
       }
       // Whose run the read is for decides only the check above; everyone shares one cached pool.
-      return poolReply(url.searchParams.get("login") ?? "", pools);
+      return poolReply(url.searchParams.get("login") ?? "", pools, url.searchParams.get("deck") || undefined);
     }
     if (card || fight || trainer || versus || runPicture) {
       // Usernames ignore case on GitHub, so a battle's two names are keyed in lower case.

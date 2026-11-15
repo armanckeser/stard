@@ -13,7 +13,10 @@ export * from "../../server/run/rules";
 // The npx app reads runs from its own server, with the player's own token (cli/src/run-reads.ts).
 const RUN_ORIGIN = APP_MODE === "local" ? window.location.origin : CARD_ORIGIN;
 
-export type Player = { login: string; avatarUrl: string | null; supporter?: true; character: Character & { level: number }; team: RunFighter[] };
+/** One of a player's public Lists, offered as a deck: its name, and the slug a pool read names it by. */
+export type DeckChoice = { slug: string; name: string };
+/** `deck` is the List the pool leaned on, when it did; `decks` the player's public Lists (a Worker from before decks sends none). */
+export type Player = { login: string; avatarUrl: string | null; supporter?: true; character: Character & { level: number }; team: RunFighter[]; deck?: string; decks?: DeckChoice[] };
 
 // One read per account and day for the page, so the first opponent can be read while
 // the player's own cards are (a cold read is several seconds each), and a new run reads
@@ -21,21 +24,22 @@ export type Player = { login: string; avatarUrl: string | null; supporter?: true
 const reads = new Map<string, Promise<Player>>();
 const today = () => new Date().toISOString().slice(0, 10);
 
-/** An account's cards. `forRun` names whose run reads them, when that is someone else's. */
-export function fetchPlayer(login: string, forRun?: string): Promise<Player> {
-  const key = `${login.toLowerCase()}|${forRun?.toLowerCase() ?? ""}|${today()}`;
+/** An account's cards. `forRun` names whose run reads them, when that is someone else's; `deck` one of their Lists to lean on. */
+export function fetchPlayer(login: string, forRun?: string, deck?: string): Promise<Player> {
+  const key = `${login.toLowerCase()}|${forRun?.toLowerCase() ?? ""}|${deck ?? ""}|${today()}`;
   const known = reads.get(key);
   if (known) return known;
-  const read = readPlayer(login, forRun);
+  const read = readPlayer(login, forRun, deck);
   reads.set(key, read);
   read.catch(() => reads.delete(key));
   return read;
 }
 
-async function readPlayer(login: string, forRun?: string): Promise<Player> {
+async function readPlayer(login: string, forRun?: string, deck?: string): Promise<Player> {
   const url = new URL("/api/run/pool", RUN_ORIGIN);
   url.searchParams.set("login", login);
   if (forRun) url.searchParams.set("for", forRun);
+  if (deck) url.searchParams.set("deck", deck);
   url.searchParams.set("_shape", RESPONSE_SHAPE);
   const response = await fetch(url);
   const body = (await response.json()) as Player & { error?: string };

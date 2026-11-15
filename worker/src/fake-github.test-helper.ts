@@ -109,7 +109,31 @@ function userNode(login: string) {
     pinnedItems: { nodes: account.pinned.map(repoNode) },
     repositories: { nodes: [] },
     starredRepositories: { nodes: account.stars.map((nameWithOwner) => ({ nameWithOwner, isPrivate: false })) },
+    lists: { nodes: (LISTS[login] ?? []).map(({ slug, isPrivate }) => ({ id: listId(login, slug), slug, name: slug.replace(/-/g, " "), isPrivate })) },
   };
+}
+
+type List = { slug: string; isPrivate: boolean; repos: string[] };
+const listId = (login: string, slug: string) => `UL_${login}_${slug}`;
+
+/** The collector's strongest 36 stars, as a public List for a deck. */
+export const STRONG_DECK = "legends";
+/** A List the collector keeps private: a deck must never read it. */
+export const PRIVATE_DECK = "secret-stash";
+const LISTS: Record<string, List[]> = {
+  [COLLECTOR]: [
+    { slug: STRONG_DECK, isPrivate: false, repos: POPULAR.filter((name) => REPOS[name].stars >= 5000) },
+    { slug: PRIVATE_DECK, isPrivate: true, repos: ["greendale/dreamatorium"] },
+  ],
+};
+
+/** A List's items, as `node(id:) { ... on UserList { items } }` answers them. */
+function listNode(id: string) {
+  for (const [login, lists] of Object.entries(LISTS)) {
+    const list = lists.find((entry) => listId(login, entry.slug) === id);
+    if (list) return { items: { nodes: list.repos.map((nameWithOwner) => ({ nameWithOwner, isPrivate: false })) } };
+  }
+  return null;
 }
 
 /** The repos a search finds: those in its `stars:` range, the most stars first. Other qualifiers are ignored. */
@@ -147,6 +171,8 @@ export async function fakeGitHub(input: RequestInfo | URL, init?: RequestInit): 
     const file = listed ? LISTED_FILES[listed[1]] : undefined;
     return Response.json({ data: { user: userNode(user[1]), here: { character: file === undefined ? null : { text: file } } } });
   }
+  const list = /node\(id: "([^"]+)"\)/.exec(query);
+  if (list) return Response.json({ data: { node: listNode(list[1]) } });
   const data: Record<string, unknown> = {};
   for (const found of query.matchAll(/(b\d+): search\(query: "([^"]+)", type: REPOSITORY, first: (\d+)\)/g)) {
     data[found[1]] = { nodes: foundBy(found[2]).slice(0, Number(found[3])).map((nameWithOwner) => ({ nameWithOwner })) };
@@ -192,6 +218,7 @@ export function fakeGitHubWhere(options: { noPlay: readonly string[] }): FakeGit
 function accountNode(account: Account) {
   return {
     stard: account.readme === null ? null : { readme: { text: account.readme } },
+    lists: { nodes: [] },
     pinnedItems: { nodes: account.pinned.map(repoNode) },
     starredRepositories: { nodes: account.stars.map((nameWithOwner) => ({ nameWithOwner, isPrivate: false })) },
   };

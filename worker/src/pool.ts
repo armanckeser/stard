@@ -20,10 +20,11 @@ const OPPONENT_LOGINS = new Set<string>(OPPONENTS);
 /** What reading a pool needs: the edge cache, the Worker's origin, the GitHub token, and the repo facts every pool shares. */
 export type PoolDeps = CacheDeps & { origin: string; token: string; facts?: FactsStore };
 
-/** An account's pool as the reply to GET /api/run/pool, from the edge when it has one. */
-export function poolReply(login: string, deps: PoolDeps): Promise<Response> {
+/** An account's pool as the reply to GET /api/run/pool, from the edge when it has one. `deck` is one of its Lists' slugs. */
+export function poolReply(login: string, deps: PoolDeps, deck?: string): Promise<Response> {
   const url = new URL("/api/run/pool", deps.origin);
   url.searchParams.set("login", login);
+  if (deck) url.searchParams.set("deck", deck);
   const lifetime = OPPONENT_LOGINS.has(login.toLowerCase()) ? OPPONENT_POOL : PLAYER_POOL;
   const popular = () => cachedPopular((query) => gql<Record<string, SearchNodes>>(deps.token, query), deps.origin, deps);
   return readThrough(cacheKeyFor(url, true), () => poolResponse(url.searchParams, deps.token, popular, deps.facts), lifetime, deps);
@@ -35,8 +36,8 @@ export function poolReply(login: string, deps: PoolDeps): Promise<Response> {
  * Raises:
  *   RunRefused: The account can't be played (unknown, no repos), or GitHub didn't answer.
  */
-export async function cachedPool(login: string, deps: PoolDeps): Promise<RunPool> {
-  const response = await poolReply(login, deps);
+export async function cachedPool(login: string, deps: PoolDeps, deck?: string): Promise<RunPool> {
+  const response = await poolReply(login, deps, deck);
   const body = (await response.json()) as RunPool & { error?: string };
   if (!response.ok) throw new RunRefused(body.error ?? "GitHub didn't answer. Try again shortly.", response.status);
   return body;

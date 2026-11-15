@@ -1253,6 +1253,32 @@ button.hud-chip:hover {
   font-size: 13px;
   color: rgb(230 237 243 / 0.55);
 }
+/* The next run's deck, under the end screen's quiet row: a word and a plain select, nothing filled. */
+.run-deck {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  font-size: 13px;
+  color: rgb(230 237 243 / 0.7);
+}
+.run-deck select {
+  height: 2rem;
+  max-width: 14rem;
+  padding: 0 8px;
+  border-radius: 4px;
+  font-size: 13px;
+  color: rgb(230 237 243 / 0.95);
+  background: rgb(255 255 255 / 0.07);
+  outline: none;
+}
+.run-deck select:focus-visible {
+  box-shadow: 0 0 0 2px var(--ring);
+}
+.run-deck option {
+  color: #e6edf3;
+  background: #161b22;
+}
 /* Who the run beat: the end screen's lead, under the title. */
 .run-panel-beat {
   margin-top: 6px;

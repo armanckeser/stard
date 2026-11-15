@@ -69,7 +69,9 @@ export type FactsStore = {
 type Player = Character & TrainerFacts & { custom: boolean };
 // `facts` is what GitHub said that `team` was worked out from; `evened` cuts `team` only.
 // `supporter` is there, and true, when the player starred this repo.
-export type Team = { login: string; avatarUrl: string | null; supporter?: true; source: TeamSource; character: Player; team: Fighter[]; facts: SideFacts };
+export type Team = { login: string; avatarUrl: string | null; supporter?: true; source: TeamSource; character: Player; team: Fighter[]; facts: SideFacts; deck?: string; decks?: DeckChoice[] };
+/** One of the player's public Lists, as a deck to pick: its name, and the slug its address and `deck` use. */
+export type DeckChoice = { slug: string; name: string };
 
 // What GitHub knows about a person that their character shows.
 const PLAYER = `createdAt followers { totalCount }
@@ -167,13 +169,28 @@ async function factsFor(token: string, names: string[], now: number, store?: Fac
   return names.flatMap((name) => known.get(name.toLowerCase()) ?? []);
 }
 
+/** A deck's name, as GitHub has it in the List's address (github.com/stars/<login>/lists/<slug>). */
+export const DECK_SLUG = /^[A-Za-z0-9._-]{1,100}$/;
+/**
+ * The most of a pool a deck may fill. A deck leans the shop toward a playstyle; the rest
+ * still comes from the player's stars, so nobody fills a run with only their strongest cards.
+ */
+export const DECK_SHARE = 0.5;
+// The List's repos read for a deck: past the share, more only change which are drawn.
+const DECK_READ = 100;
+
+export class NoSuchDeck extends Error {}
+
+type Deck = DeckChoice & { id: string; isPrivate: boolean };
+
 // A team is four cards: one ace the player chose and three drawn from their stars for
 // the day. The ace is the first of the top four in their Stard profile, else their
 // first pinned repo, else their own most-starred repo. Someone with too few stars
 // fills the rest from what they chose and then from their own repos, then from
 // `popular` when given (a run's pool, worker/src/popular.ts), and may still come up
-// short; `evened` then trims the other side to match.
-export async function teamFor(token: string, login: string, now: number, size = TEAM_SIZE, popular?: () => Promise<PopularList>, kept?: FactsStore): Promise<Team> {
+// short; `evened` then trims the other side to match. `deck` is one of the player's
+// public Lists by its slug: up to DECK_SHARE of the cards are drawn from it.
+export async function teamFor(token: string, login: string, now: number, size = TEAM_SIZE, popular?: () => Promise<PopularList>, kept?: FactsStore, deck?: string): Promise<Team> {
   const name = JSON.stringify(login);
   const starred = supporters(token, now);
   const data = await gql<{
@@ -186,6 +203,7 @@ export async function teamFor(token: string, login: string, now: number, size = 
       pinnedItems: { nodes: ({ nameWithOwner: string } | Record<string, never>)[] };
       repositories: { nodes: { nameWithOwner: string }[] };
       starredRepositories: { nodes: { nameWithOwner: string; isPrivate: boolean }[] };
+      lists: { nodes: Deck[] };
     }) | null;
   }>(
     token,
@@ -202,6 +220,7 @@ export async function teamFor(token: string, login: string, now: number, size = 
       pinnedItems(first: ${TEAM_SIZE}, types: REPOSITORY) { nodes { ... on Repository { nameWithOwner } } }
       repositories(first: ${TEAM_SIZE}, ownerAffiliations: OWNER, isFork: false, privacy: PUBLIC, orderBy: { field: STARGAZERS, direction: DESC }) { nodes { nameWithOwner } }
       starredRepositories(first: 100, orderBy: { field: STARRED_AT, direction: DESC }) { nodes { nameWithOwner isPrivate } }
+      lists(first: 100) { nodes { id slug name isPrivate } }
     }
     here: repository(owner: ${JSON.stringify(SELF_REPO.owner)}, name: ${JSON.stringify(SELF_REPO.name)}) {
       character: object(expression: ${JSON.stringify(`HEAD:${listedCharacterPath(login)}`)}) { ... on Blob { text } }
@@ -240,13 +259,16 @@ export async function teamFor(token: string, login: string, now: number, size = 
   const stars = user.starredRepositories.nodes.filter((repo) => !repo.isPrivate).map((repo) => repo.nameWithOwner);
   if (ace.length === 0 && stars.length > 0) source = "stars";
   const day = new Date(now).toISOString().slice(0, 10);
-  const drawnNames = drawFromStars(stars, ace, size - ace.length, `${user.login.toLowerCase()}|${day}`);
+  // The deck's repos are starred too, so the stars draw skips all of them: the deck fills its share and no more.
+  const inDeck = deck ? await deckRepos(token, user, deck) : [];
+  const decked = drawFromStars(inDeck, ace, Math.min(Math.floor(size * DECK_SHARE), size - ace.length), `${user.login.toLowerCase()}|${day}|deck`);
+  const drawnNames = [...decked, ...drawFromStars(stars, [...ace, ...inDeck], size - ace.length - decked.length, `${user.login.toLowerCase()}|${day}`)];
   // An account with few stars fills the rest of its pool from its own repos.
   const spares = [...new Set([...chosen.slice(1), ...owned])]
     .filter((name) => !ace.includes(name) && !drawnNames.includes(name))
     .slice(0, Math.max(0, size - ace.length - drawnNames.length));
   const short = size - ace.length - drawnNames.length - spares.length;
-  const fill = short > 0 && popular ? pickPopular(await popular(), short, [...ace, ...drawnNames, ...spares, ...stars], `${user.login.toLowerCase()}|${day}|popular`) : [];
+  const fill = short > 0 && popular ? pickPopular(await popular(), short, [...ace, ...drawnNames, ...spares, ...stars, ...inDeck], `${user.login.toLowerCase()}|${day}|popular`) : [];
 
   const known = new Map(fromProfile.map((node) => [node.nameWithOwner, node]));
   const unread = [...ace, ...drawnNames, ...spares, ...fill].filter((name) => !known.has(name));
@@ -267,7 +289,24 @@ export async function teamFor(token: string, login: string, now: number, size = 
   const team = fieldTeam(repos, user.login, character.klass, now).map((fighter, i) => (repos[i].wildcard ? { ...fighter, wildcard: true } : repos[i].popular ? { ...fighter, popular: true } : fighter));
   const facts: SideFacts = { readAt: new Date(now).toISOString(), character: built, ace: aceNodes[0]?.nameWithOwner ?? null, source, repos };
   const mark = supporterMark(await starred.soFar(), user.login, user.stard?.noPlay ? "left-out" : "in");
-  return { login: user.login, avatarUrl: user.avatarUrl, ...mark, source, character, team, facts };
+  return { login: user.login, avatarUrl: user.avatarUrl, ...mark, source, character, team, facts, ...(deck ? { deck } : {}), decks: user.lists.nodes.filter((list) => !list.isPrivate).map(({ slug, name }) => ({ slug, name })) };
+}
+
+/**
+ * The public repos in one of the player's public Lists. The token may be the Lists' owner's
+ * (the demo's own account), so a private List reads as missing, never as its repos.
+ *
+ * Raises:
+ *   NoSuchDeck: The player has no public List with that slug.
+ */
+async function deckRepos(token: string, user: { login: string; lists: { nodes: Deck[] } }, slug: string): Promise<string[]> {
+  const list = user.lists.nodes.find((node) => node.slug.toLowerCase() === slug.toLowerCase() && !node.isPrivate);
+  if (!list) throw new NoSuchDeck(`${user.login} has no public List called ${slug}.`);
+  const data = await gql<{ node: { items: { nodes: ({ nameWithOwner: string; isPrivate: boolean } | Record<string, never>)[] } } | null }>(
+    token,
+    `query { node(id: ${JSON.stringify(list.id)}) { ... on UserList { items(first: ${DECK_READ}) { nodes { ... on Repository { nameWithOwner isPrivate } } } } } }`,
+  );
+  return (data.node?.items.nodes ?? []).flatMap((node) => ("nameWithOwner" in node && !node.isPrivate ? [node.nameWithOwner] : []));
 }
 
 /** Both teams cut to the size of the smaller one, so nobody plays five cards against two. */
@@ -339,14 +378,17 @@ export function withRunCards(player: Team): RunPool {
 export async function poolResponse(params: URLSearchParams, token: string, popular?: () => Promise<PopularList>, facts?: FactsStore): Promise<Response> {
   const login = params.get("login") ?? "";
   if (!LOGIN.test(login)) return json({ error: "A run needs a GitHub username." }, 400, CACHE_SECONDS);
+  const deck = params.get("deck") || undefined;
+  if (deck !== undefined && !DECK_SLUG.test(deck)) return json({ error: "A deck is one of your Lists, by the name in its address." }, 400, CACHE_SECONDS);
   const busy = busyUntil(Date.now());
   if (busy) return busyReply(busy);
   try {
-    const player = await teamFor(token, login, Date.now(), POOL_SIZE, popular, facts);
+    const player = await teamFor(token, login, Date.now(), POOL_SIZE, popular, facts, deck);
     if (player.team.length === 0) return json({ error: `${player.login} has no public repos to play with.` }, 404, CACHE_SECONDS);
     return json(withRunCards(player), 200, CACHE_SECONDS);
   } catch (error) {
     if (error instanceof NoSuchUser) return json({ error: `No GitHub user called ${error.message}.` }, 404, CACHE_SECONDS);
+    if (error instanceof NoSuchDeck) return json({ error: `${error.message} Pick another deck.` }, 404, 0);
     console.error(error);
     const busy = busyUntil(Date.now());
     if (busy) return busyReply(busy);
