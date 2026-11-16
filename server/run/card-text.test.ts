@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { ABILITIES } from "./abilities.ts";
 import { BOOSTS } from "./boosts.ts";
 import { CLASS_EFFECTS } from "./classes.ts";
+import { CLASSES } from "../character.ts";
 import { CONDITIONS } from "./hooks.ts";
 import { CONDITION_WORDS, conditionOfWord, conditionTip, withFirst } from "./names.ts";
 import { FAMILIES, TOPIC } from "./sets.ts";
@@ -24,6 +25,11 @@ describe("card text", () => {
   it.each(texts)("%s: at most 8 words, no pointer words", (_, text) => {
     expect(text.split(/\s+/).length).toBeLessThanOrEqual(MAX_WORDS);
     expect(text).not.toMatch(POINTERS);
+  });
+
+  // Regression guarded: the class picker showed Maintainer as "Fight start: {first} gains an 8% HP shield."
+  it("shows every class's effect with its card named", () => {
+    for (const klass of Object.values(CLASSES)) expect(klass.perk).not.toContain("{");
   });
 
   it("names the team's first card, or the ace when there's no team", () => {

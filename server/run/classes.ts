@@ -9,6 +9,9 @@ import type { Snapshot } from "./types.ts";
 /** `reaches(team)` lists the indexes of the cards that carry the effect; `effects` may depend on the team. */
 export type ClassEffect = { text: string; reaches: (team: Snapshot) => number[]; on: Trigger; effects: Effect[] | ((team: Snapshot) => Effect[]) };
 
+/** Card text with `{first}` named: the team's first card (a boost's `first`), or "your ace" when no team is at hand. */
+export const withFirst = (text: string, first?: string): string => text.replace("{first}", first ?? "your ace");
+
 const every = (team: Snapshot) => team.units.map((_, index) => index);
 
 /** The cards of the family most cards on the team share; on a tie, the family met first. */

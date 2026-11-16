@@ -1,3 +1,4 @@
+/// <reference types="vitest/config" />
 import { defineConfig, type Plugin } from "vite";
 import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
@@ -59,4 +60,6 @@ export default defineConfig({
       }]),
     ],
   },
+  // Worktrees hold whole copies of the repo; their tests are their branches', not this one's.
+  test: { exclude: ["**/node_modules/**", "**/dist/**", ".worktrees/**"] },
 });

@@ -3,7 +3,7 @@
 // anywhere. The person builds one, and everything about it travels in the address of
 // the trainer card they paste into their profile README; the game reads it from there.
 
-import { CLASS_EFFECTS } from "./run/classes.ts";
+import { CLASS_EFFECTS, withFirst } from "./run/classes.ts";
 
 export const CLASS_IDS = ["rookie", "maintainer", "scout", "collector", "specialist", "veteran", "archivist"] as const;
 export type ClassId = (typeof CLASS_IDS)[number];
@@ -14,12 +14,12 @@ export type ClassId = (typeof CLASS_IDS)[number];
  */
 export const CLASSES: Record<ClassId, { label: string; perk: string; battlePerk: string; color: string }> = {
   rookie: { label: "Rookie", perk: "No class effect yet. Pick a class to get one.", battlePerk: "No perk yet.", color: "#3a4049" },
-  maintainer: { label: "Maintainer", perk: CLASS_EFFECTS.maintainer.text, battlePerk: "Repos you own are 8% stronger.", color: "#1fa866" },
-  scout: { label: "Scout", perk: CLASS_EFFECTS.scout.text, battlePerk: "Cards under 1,000 stars are 15% stronger.", color: "#1f8fe0" },
-  collector: { label: "Collector", perk: CLASS_EFFECTS.collector.text, battlePerk: "A team of all different types is 6% stronger.", color: "#7c5cd6" },
-  specialist: { label: "Specialist", perk: CLASS_EFFECTS.specialist.text, battlePerk: "Three or more cards of one type hit 10% harder.", color: "#d9482b" },
-  veteran: { label: "Veteran", perk: CLASS_EFFECTS.veteran.text, battlePerk: "Cards 8 years or older get 12% more HP and defense.", color: "#d99a0b" },
-  archivist: { label: "Archivist", perk: CLASS_EFFECTS.archivist.text, battlePerk: "Archived repos fight at full strength.", color: "#77818d" },
+  maintainer: { label: "Maintainer", perk: withFirst(CLASS_EFFECTS.maintainer.text), battlePerk: "Repos you own are 8% stronger.", color: "#1fa866" },
+  scout: { label: "Scout", perk: withFirst(CLASS_EFFECTS.scout.text), battlePerk: "Cards under 1,000 stars are 15% stronger.", color: "#1f8fe0" },
+  collector: { label: "Collector", perk: withFirst(CLASS_EFFECTS.collector.text), battlePerk: "A team of all different types is 6% stronger.", color: "#7c5cd6" },
+  specialist: { label: "Specialist", perk: withFirst(CLASS_EFFECTS.specialist.text), battlePerk: "Three or more cards of one type hit 10% harder.", color: "#d9482b" },
+  veteran: { label: "Veteran", perk: withFirst(CLASS_EFFECTS.veteran.text), battlePerk: "Cards 8 years or older get 12% more HP and defense.", color: "#d99a0b" },
+  archivist: { label: "Archivist", perk: withFirst(CLASS_EFFECTS.archivist.text), battlePerk: "Archived repos fight at full strength.", color: "#77818d" },
 };
 
 // What a figure is made of. Each style part is one id from its list below; each colour
