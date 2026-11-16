@@ -21,7 +21,12 @@ export function Customize({ login, player }: { login: string; player?: Player })
   const [reading, setReading] = useState<Reading>({ state: "idle" });
   const [picked, setPicked] = useState<Choices>({});
   const shown = player ?? (read && read.login.toLowerCase() === login.toLowerCase() ? read : null);
-  const pick = (change: Choices) => setPicked(pickFor(login, change));
+  // A new deck or ace deals different cards: reading them now means Play starts without a second wait.
+  const pick = (change: Choices) => {
+    const next = pickFor(login, change);
+    setPicked(next);
+    if ("deck" in change || "ace" in change) void fetchPlayer(login, undefined, { deck: next.deck, ace: next.ace }).catch(() => {});
+  };
 
   async function openSheet() {
     setPicked(choicesFor(login));

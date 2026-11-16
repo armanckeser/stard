@@ -58,6 +58,9 @@ describe("the end screen", () => {
 });
 
 describe("Customize your team", () => {
+  // A pick reads the cards it deals; no test reaches the network.
+  beforeEach(() => vi.stubGlobal("fetch", async () => new Response(JSON.stringify(poolFor("abed")))));
+
   it("keeps the picked deck, ace and class for the next run", async () => {
     localStorage.clear();
     const player = { ...poolFor("abed"), decks: [{ slug: "web-tools", name: "Web tools" }], aces: poolFor("abed").team.slice(0, 2).map((fighter) => fighter.fullName) };
@@ -68,6 +71,23 @@ describe("Customize your team", () => {
     fireEvent.change(sheet.querySelector("#pick-Ace")!, { target: { value: player.aces[1] } });
     fireEvent.click(screen.getByRole("radio", { name: /Scout/ }));
     expect(choicesFor("abed")).toMatchObject({ deck: "web-tools", ace: player.aces[1], klass: "scout" });
+  });
+
+  // Regression guarded: picking a deck, then pressing Play, read the player's stars a second time.
+  it("reads the cards a picked deck deals as soon as it's picked", async () => {
+    localStorage.clear();
+    const asked: string[] = [];
+    const fake = async (url: URL | string) => {
+      asked.push(String(url));
+      return new Response(JSON.stringify(poolFor("abed")));
+    };
+    vi.stubGlobal("fetch", fake);
+    const player = { ...poolFor("abed"), decks: [{ slug: "cli-tools", name: "CLI tools" }] };
+    render(<RunEnd player={player} seed="greendale" rounds={[]} results={[]} team={[]} wins={1} losses={3} onNewRun={() => {}} />);
+    await act(async () => fireEvent.click(screen.getByRole("button", { name: "Customize your team" })));
+    const sheet = await screen.findByRole("dialog", { name: "Customize your team" });
+    fireEvent.change(sheet.querySelector("#pick-Deck")!, { target: { value: "cli-tools" } });
+    expect(asked.some((url) => url.includes("/api/run/pool") && url.includes("deck=cli-tools"))).toBe(true);
   });
 });
 

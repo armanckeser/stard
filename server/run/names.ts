@@ -53,8 +53,7 @@ export function conditionOfWord(word: string): Condition {
   return "merge-conflict";
 }
 
-/** Card text with `{first}` named: the team's first card (a boost's `first`), or "your ace" when no team is at hand. */
-export const withFirst = (text: string, first?: string): string => text.replace("{first}", first ?? "your ace");
+export { withFirst } from "./classes.ts";
 
 /**
  * A condition as a sentence, for a card with `fullHp` and `ticksLeft` of it to go:
