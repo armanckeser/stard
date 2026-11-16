@@ -2,6 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
 import { Download, History, Upload } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Help } from "@/components/compose/controls";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { changeCount, type BackupReason, type BackupSummary, type RestorePlan } from "@/lib/backup";
 import { localApi, type BackupsResponse } from "@/lib/local-api";
@@ -83,9 +84,9 @@ function LocalBackups() {
       <header className="flex flex-wrap items-start justify-between gap-3">
         <div className="space-y-1">
           <h1 className="font-display text-2xl font-bold tracking-tight">Backups</h1>
-          <p className="text-sm text-muted-foreground">
-            Each launch backs up your stars and Lists before the app can change anything. A restore only adds back what
-            is missing: it never unstars a repo or deletes a List.
+          <p className="flex items-center gap-1 text-sm text-muted-foreground">
+            Taken on every launch. Restore only adds.
+            <Help label="About backups">Each launch backs up your stars and Lists before the app changes anything. A restore never unstars a repo or deletes a List.</Help>
           </p>
           {state && <p className="text-xs text-muted-foreground">Saved in <code>{state.directory}</code></p>}
         </div>
@@ -118,10 +119,10 @@ function LocalBackups() {
       </ul>
 
       <section className="space-y-2">
-        <h2 className="text-sm font-semibold">Restore from a file</h2>
-        <p className="text-sm text-muted-foreground">
-          A backup you downloaded, from this computer or another. You see what it would change before anything does.
-        </p>
+        <h2 className="flex items-center gap-1 text-sm font-semibold">
+          Restore from a file
+          <Help label="About restoring from a file">A backup you downloaded, from any computer. You see what it would change first.</Help>
+        </h2>
         <input ref={fileInput} type="file" accept="application/json,.json" className="hidden"
           onChange={(event) => { handleFile(event.target.files?.[0]); event.target.value = ""; }} />
         <Button variant="outline" size="sm" disabled={working} onClick={() => fileInput.current?.click()}>
