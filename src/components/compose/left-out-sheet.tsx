@@ -1,4 +1,5 @@
 import { Button } from "@/components/ui/button";
+import { Help } from "./controls";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { useIsDesktop } from "@/hooks/use-media-query";
 import type { Composed, ComposeRepo } from "@/lib/published-list";
@@ -46,8 +47,9 @@ export function LeftOutSheet({
       >
         <SheetHeader>
           <SheetTitle className="font-display text-lg">Left out</SheetTitle>
-          <SheetDescription>
-            Archived repos are never listed. A quiet repo has had no push in about six months; keep one when the repo is finished and still good.
+          <SheetDescription className="flex items-center gap-1">
+            Quiet: no push in 6 months.
+            <Help label="About left out repos">Archived repos are never listed. Keep a quiet repo that is finished and still good.</Help>
           </SheetDescription>
         </SheetHeader>
         <div className="space-y-6 px-4 pb-6">
@@ -66,7 +68,7 @@ export function LeftOutSheet({
             <section>
               <h3 className="mb-2 text-xs font-medium uppercase tracking-wider text-muted-foreground">Archived ({archived.length})</h3>
               <ul>
-                {archived.map((repo) => <RepoRow key={repo.id} repo={repo} note="Archived repos are never listed" />)}
+                {archived.map((repo) => <RepoRow key={repo.id} repo={repo} note="Never listed" />)}
               </ul>
             </section>
           )}

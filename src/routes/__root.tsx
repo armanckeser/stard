@@ -203,11 +203,10 @@ function StarThisRepo() {
 function DemoNote() {
   return (
     <>
-      Demo: public stars read from GitHub. Lists, tags and notes you make stay in this tab.{" "}
+      Demo · changes stay in this tab ·{" "}
       <a href="https://github.com/armanckeser/stard" className="font-medium text-primary underline-offset-4 hover:underline">
-        Self-host it
+        Self-host to sync
       </a>{" "}
-      to sync with your own account.{" "}
       {/* Its own line in the narrow mobile popover; inline in the desktop bar. */}
       <span className="mt-2 block md:mt-0 md:inline">
         <DemoCredit />
