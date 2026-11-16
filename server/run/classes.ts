@@ -13,6 +13,8 @@ export type ClassEffect = { text: string; reaches: (team: Snapshot) => number[];
 export const withFirst = (text: string, first?: string): string => text.replace("{first}", first ?? "your ace");
 
 const every = (team: Snapshot) => team.units.map((_, index) => index);
+const ownerOf = (card: { fullName: string }) => card.fullName.split("/")[0].toLowerCase();
+const VETERAN_YEARS = 8;
 
 /** The cards of the family most cards on the team share; on a tie, the family met first. */
 function biggestFamily(team: Snapshot): number[] {
@@ -23,12 +25,12 @@ function biggestFamily(team: Snapshot): number[] {
 }
 
 export const CLASS_EFFECTS: Record<Exclude<ClassId, "rookie">, ClassEffect> = {
-  maintainer: { text: "Fight start: {first} gains an 8% HP shield.", reaches: () => [0], on: "start", effects: [{ kind: "shield", aim: "self", share: 0.08 }] },
-  scout: { text: "1- and 2-gold cards gain 25% attack.", reaches: (team) => every(team).filter((index) => team.units[index].card.rarity <= 1), on: "start", effects: [{ kind: "stat", aim: "self", stat: "attack", by: 0.25 }] },
+  maintainer: { text: "Your ace and own repos gain 45% attack.", reaches: (team) => every(team).filter((index) => index === 0 || ownerOf(team.units[index].card) === team.login.toLowerCase()), on: "start", effects: [{ kind: "stat", aim: "self", stat: "attack", by: 0.45 }] },
+  scout: { text: "Cards under 1,000 stars gain 25% attack.", reaches: (team) => every(team).filter((index) => team.units[index].card.rarity <= 1), on: "start", effects: [{ kind: "stat", aim: "self", stat: "attack", by: 0.25 }] },
   collector: { text: "Every card gains 3% attack per family.", reaches: every, on: "start", effects: (team) => [{ kind: "stat", aim: "self", stat: "attack", by: 0.03 * new Set(team.units.map((unit) => unit.card.type)).size }] },
   specialist: { text: "Your biggest family gains 20% attack.", reaches: biggestFamily, on: "start", effects: [{ kind: "stat", aim: "self", stat: "attack", by: 0.2 }] },
-  veteran: { text: "Every card gains 10% guard.", reaches: every, on: "start", effects: [{ kind: "stat", aim: "self", stat: "guard", by: 0.1 }] },
-  archivist: { text: "Ally faints: team heals 3%.", reaches: every, on: "ally-faint", effects: [{ kind: "heal", aim: "self", share: 0.03 }] },
+  veteran: { text: "Repos 8+ years old gain 20% guard.", reaches: (team) => every(team).filter((index) => (team.units[index].card.age ?? 0) >= VETERAN_YEARS), on: "start", effects: [{ kind: "stat", aim: "self", stat: "guard", by: 0.2 }] },
+  archivist: { text: "Quiet repos gain a 6% HP shield.", reaches: (team) => every(team).filter((index) => team.units[index].card.quiet === true), on: "start", effects: [{ kind: "shield", aim: "self", share: 0.06 }] },
 };
 
 /** The class hooks each unit carries: `classHooks(team)[i]` belongs to `team.units[i]`. A rookie or an unknown class carries none. */

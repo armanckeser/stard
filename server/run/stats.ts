@@ -84,6 +84,9 @@ export function signalsOf(repo: CardFacts, now: number): Signals {
   };
 }
 
+/** No push in about six months: what the organizer calls a quiet repo, and what Archivist reads. */
+export const QUIET_DAYS = 183;
+
 export function rarityOf(stars: number): Card["rarity"] {
   return RARITY_STARS.filter((from) => stars >= from).length as Card["rarity"];
 }
@@ -152,6 +155,7 @@ export function roleOf(card: Card): Role {
 /** The card a repo becomes, the same for every player. */
 export function cardFor(repo: CardFacts, now: number): Card {
   const points = statPoints(repo, now);
+  const signals = signalsOf(repo, now);
   const shiny = isShiny(repo.fullName);
   const lift = shiny ? SHINY : 1;
   const type = typeOf(repo.language);
@@ -165,7 +169,9 @@ export function cardFor(repo: CardFacts, now: number): Card {
     guard: Math.round(points.guard * lift),
     speed: Math.round(points.speed * lift),
     range: REACH.includes(type) ? 3 : 1,
-    ability: abilityFor(signalsOf(repo, now), repo.fullName),
+    ability: abilityFor(signals, repo.fullName),
     shiny,
+    age: Math.floor(signals.age),
+    quiet: signals.archived || signals.daysQuiet >= QUIET_DAYS,
   };
 }
