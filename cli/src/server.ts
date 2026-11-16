@@ -207,7 +207,7 @@ export function createLocalServer({ github, token, appDir, port, store, login }:
   });
 
   app.route("/api/local", api);
-  app.route("/api/run", runReads(token));
+  app.route("/api", runReads(token));
   app.all("/api/*", (c) => c.json({ error: "Not found." }, 404));
 
   app.use("/*", serveStatic({ root: appDir }));

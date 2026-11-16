@@ -13,6 +13,8 @@ import { RepoCard } from "@/components/battle/repo-card";
 import { demoUser } from "@/lib/demo";
 import { CAN_PLAY, challenge, playingAs } from "@/lib/game-api";
 import { APP_URL, CARD_ORIGIN, validLogin } from "@/lib/published-list";
+import { APP_MODE } from "@/lib/mode";
+import { PLAY_ORIGIN } from "@/lib/run";
 import type { BattleResult, Fighter, Side } from "../../server/battle";
 import { CLASSES, defaultCharacter, readLook, type Character } from "../../server/character";
 
@@ -203,7 +205,7 @@ function BattlePage() {
     setLoading(true);
     setError("");
     setBattle(null);
-    fetch(`${CARD_ORIGIN}/api/battle?a=${encodeURIComponent(search.a)}&b=${encodeURIComponent(search.b)}`)
+    fetch(`${PLAY_ORIGIN}/api/battle?a=${encodeURIComponent(search.a)}&b=${encodeURIComponent(search.b)}`)
       .then(async (response) => {
         const body = (await response.json()) as Battle & { error?: string };
         if (stale) return;
@@ -226,8 +228,9 @@ function BattlePage() {
   }, [search.a, search.b]);
 
   // The share picture is slow to draw, so the Worker draws and caches it before anyone shares the link.
+  // The npx app tells the website nothing until its player shares.
   useEffect(() => {
-    if (!search.a || !search.b || !validLogin(search.a) || !validLogin(search.b)) return;
+    if (APP_MODE === "local" || !search.a || !search.b || !validLogin(search.a) || !validLogin(search.b)) return;
     fetch(`${CARD_ORIGIN}/api/card/versus.png?a=${encodeURIComponent(search.a)}&b=${encodeURIComponent(search.b)}`).catch(() => {});
   }, [search.a, search.b]);
 

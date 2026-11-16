@@ -1,13 +1,14 @@
 import { Hono } from "hono";
-import { gql, poolResponse } from "../../worker/src/battle.ts";
+import { battleResponse, gql, poolResponse } from "../../worker/src/battle.ts";
 import { OptedOut, checkPoolRead, opponentsBody, readOptOuts, type OptOuts } from "../../worker/src/no-play.ts";
 import { readPopular, type PopularList, type SearchNodes } from "../../worker/src/popular.ts";
 
-// The Play screen's two reads, answered here with the player's own token by the hosted
-// Worker's code (worker/src/battle.ts), so a run from this app spends none of the
-// Worker's GitHub points, and still starts when the Worker says it's busy.
+// The Play and Battle screens' reads, answered here with the player's own token by the
+// hosted Worker's code (worker/src/battle.ts), so this app spends none of the Worker's
+// GitHub points, still plays when the Worker says it's busy, and tells the website nothing.
 //   GET /api/run/pool?login=<login>&for=<login>   an account's 40 cards
 //   GET /api/run/opponents                        who asked not to be played
+//   GET /api/battle?a=<login>&b=<login>           an instant battle
 
 const NO_BLOCK_LIST: ReadonlySet<string> = new Set();
 
@@ -24,7 +25,7 @@ export function runReads(token: string): Hono {
     return popular;
   };
 
-  api.get("/pool", async (c) => {
+  api.get("/run/pool", async (c) => {
     const params = new URL(c.req.url).searchParams;
     try {
       await checkPoolRead(params, optOuts, NO_BLOCK_LIST);
@@ -35,6 +36,7 @@ export function runReads(token: string): Hono {
     return poolResponse(params, token, readPopularOnce);
   });
 
-  api.get("/opponents", async (c) => c.json(await opponentsBody(optOuts)));
+  api.get("/run/opponents", async (c) => c.json(await opponentsBody(optOuts)));
+  api.get("/battle", (c) => battleResponse("battle", new URL(c.req.url).searchParams, token));
   return api;
 }
