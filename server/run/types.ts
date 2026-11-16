@@ -28,6 +28,10 @@ export type Card = {
   /** An id from ABILITIES. */
   ability: string;
   shiny: boolean;
+  /** Whole years since the repo was made. Missing on cards saved before classes read it. */
+  age?: number;
+  /** Archived, or no push in QUIET_DAYS. Missing on cards saved before classes read it. */
+  quiet?: boolean;
 };
 
 export type Placed = { card: Card; col: number; row: number };
