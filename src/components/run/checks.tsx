@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { ChevronDown } from "lucide-react";
 import { boostById } from "../../../server/run/boosts";
+import { CardText, firstName } from "./card-text";
 import { setName } from "../../../server/run/names";
 import { checksOf, TIERS, type TeamSet } from "../../../server/run/sets";
 import type { Card } from "../../../server/run/types";
@@ -77,7 +78,7 @@ export function Checks({ title, cards, boosts, align = "left", folds = false }: 
               <span className="boost-pip" aria-hidden />
               <span className="check-detail" role="tooltip">
                 <span className="block font-display text-[13px] font-bold">{boost.name}</span>
-                <span className="mt-1 block text-[12px] leading-snug">{boost.text}</span>
+                <span className="mt-1 block text-[12px] leading-snug"><CardText text={boost.text} first={firstName(cards[0]?.fullName)} plain /></span>
               </span>
             </li>
           ))}

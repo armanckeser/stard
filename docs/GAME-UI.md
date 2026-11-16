@@ -113,7 +113,8 @@ What fired is drawn on the board, not written. One look per effect kind, so ever
 
 - **Name the thing.** No "it", "its", "one", "them", "whoever" or "the rest" where the noun is short. "Rate-limits attackers", not "Whoever hits it is rate limited".
 - **Labels, not sentences.** A button, title or field gets a label ("Play", "Fight"). Full sentences only in Help and in errors.
-- **Card text is game grammar:** "Trigger: effect", the number first, at most 8 words. "Every 3rd hit: heal 10%".
+- **Card text is game grammar:** "Trigger: effect", at most 8 words (`server/run/card-text.test.ts` holds it). The triggers are the ones auto battlers taught players: **Fight start:**, **On attack:**, **Every 3rd attack:**, **When hit:**, **Ally faints:**, **Once, at 50% HP:**. "Every 3rd attack: heal 10%". A boost for the team's first card names that card (`{first}`), never "the first card".
+- **A condition explains itself:** its word in card text is dotted, and a tap gives the definition in the form established games use for the same effect: "Flaky: 25% chance to miss, for 3 s" (Blind), "Rate limited: 33% slower attacks" (Chill), "Deprecated: loses 3% max HP per second" (Burn), "Merge conflict: 33% chance to hit itself" (confusion).
 - **A rule shows once, where it's used.** The HUD's pips show the wins and losses, so the start panel doesn't repeat them.
 - **Explain on demand.** Anything longer than a label sits behind the screen's ? (its rules) or an ⓘ beside one control (`Help` in `src/components/compose/controls.tsx`). How to play never opens by itself: a player who touches nothing for 10 s in round 1 sees the ? light up for 4 s, once.
 - **No plumbing on the happy path.** Browser storage, GitHub threads and `npx` show only in Help, or in the error that needs them.

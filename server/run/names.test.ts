@@ -76,27 +76,27 @@ describe("effectsOf", () => {
 });
 
 // Regression guarded: the fight's creature panel tells a player what a condition does
-// and how long it has left; a sentence that drifts from the engine's numbers (1.5× slower,
-// 1 hit in 3) or reads "0 s left" while the badge still shows teaches the wrong rule.
+// and how long it has left; a sentence that drifts from the engine's numbers (33% slower
+// attacks, 33% chance to hit itself) or reads "0 s left" while the badge still shows teaches the wrong rule.
 describe("conditionLine", () => {
   it.each([
-    ["merge-conflict", 20, 120, "Merge conflict: 1 hit in 3 lands on itself, 2 s left"],
-    ["rate-limited", 20, 120, "Rate limited: acts 1.5× slower, 2 s left"],
-    ["deprecated", 30, 120, "Deprecated: loses 4 HP each second, 3 s left"],
-    ["flaky", 10, 120, "Flaky: 1 hit in 4 misses, 1 s left"],
+    ["merge-conflict", 20, 120, "Merge conflict: 33% chance to hit itself, 2 s left"],
+    ["rate-limited", 20, 120, "Rate limited: 33% slower attacks, 2 s left"],
+    ["deprecated", 30, 120, "Deprecated: loses 4 HP per second, 3 s left"],
+    ["flaky", 10, 120, "Flaky: 25% chance to miss, 1 s left"],
   ] as const)("says what %s does, with %i ticks left", (condition, ticksLeft, fullHp, line) => {
     expect(conditionLine(condition, ticksLeft, fullHp)).toBe(line);
   });
 
   it.each([
-    [11, "Rate limited: acts 1.5× slower, 2 s left"],
-    [1, "Rate limited: acts 1.5× slower, 1 s left"],
-    [0, "Rate limited: acts 1.5× slower, 1 s left"],
+    [11, "Rate limited: 33% slower attacks, 2 s left"],
+    [1, "Rate limited: 33% slower attacks, 1 s left"],
+    [0, "Rate limited: 33% slower attacks, 1 s left"],
   ])("rounds %i ticks left up, never to 0 s", (ticksLeft, line) => {
     expect(conditionLine("rate-limited", ticksLeft, 120)).toBe(line);
   });
 
   it("never says a deprecated card loses 0 HP, however small its HP", () => {
-    expect(conditionLine("deprecated", 30, 10)).toBe("Deprecated: loses 1 HP each second, 3 s left");
+    expect(conditionLine("deprecated", 30, 10)).toBe("Deprecated: loses 1 HP per second, 3 s left");
   });
 });

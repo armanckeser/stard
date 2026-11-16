@@ -2,7 +2,7 @@ import { CLASSES, isClass } from "../character.ts";
 import { abilityById } from "./abilities.ts";
 import { CLASS_EFFECTS } from "./classes.ts";
 import { boostById } from "./boosts.ts";
-import { DEPRECATED_EVERY, deprecatedLoss, FLAKY_ODDS, MERGE_CONFLICT_ODDS, RATE_LIMITED, type Condition, type Effect, type Gate, type Stat, type Trigger } from "./hooks.ts";
+import { CONDITION_TICKS, DEPRECATED_EVERY, DEPRECATED_SHARE, deprecatedLoss, FLAKY_ODDS, MERGE_CONFLICT_ODDS, RATE_LIMITED, type Condition, type Effect, type Gate, type Stat, type Trigger } from "./hooks.ts";
 import { bonusOf } from "./sets.ts";
 import { TICK_MS, type Card } from "./types.ts";
 
@@ -21,21 +21,44 @@ export const CONDITION_NAMES: Record<Condition, string> = {
 
 const MILLISECONDS_PER_SECOND = 1000;
 const secondsOf = (ticks: number) => (ticks * TICK_MS) / MILLISECONDS_PER_SECOND;
-/** "1 hit in 3" for odds of 1/3. */
-const oneIn = (odds: number) => `1 hit in ${Math.round(1 / odds)}`;
-const everySecond = secondsOf(DEPRECATED_EVERY) === 1 ? "each second" : `every ${secondsOf(DEPRECATED_EVERY)} s`;
+const PERCENT = 100;
+const asPercent = (share: number) => `${Math.round(share * PERCENT)}%`;
+const perSecond = secondsOf(DEPRECATED_EVERY) === 1 ? "per second" : `every ${secondsOf(DEPRECATED_EVERY)} s`;
 
-/** What each condition does to the card wearing it, read from the numbers the fight uses (hooks.ts). */
-const CONDITION_EFFECTS: Record<Condition, (fullHp: number) => string> = {
-  "merge-conflict": () => `${oneIn(MERGE_CONFLICT_ODDS)} lands on itself`,
-  "rate-limited": () => `acts ${RATE_LIMITED}× slower`,
-  deprecated: (fullHp) => `loses ${deprecatedLoss(fullHp)} HP ${everySecond}`,
-  flaky: () => `${oneIn(FLAKY_ODDS)} misses`,
+/**
+ * What each condition does to the card wearing it, in the words established games use
+ * for the same thing (Blind, Chill, Burn, confusion), read from the numbers the fight
+ * uses (hooks.ts). A deprecated card's loss is in HP when its full HP is known.
+ */
+const CONDITION_EFFECTS: Record<Condition, (fullHp?: number) => string> = {
+  "merge-conflict": () => `${asPercent(MERGE_CONFLICT_ODDS)} chance to hit itself`,
+  "rate-limited": () => `${asPercent(1 - 1 / RATE_LIMITED)} slower attacks`,
+  deprecated: (fullHp) => `loses ${fullHp === undefined ? `${asPercent(DEPRECATED_SHARE)} max HP` : `${deprecatedLoss(fullHp)} HP`} ${perSecond}`,
+  flaky: () => `${asPercent(FLAKY_ODDS)} chance to miss`,
 };
+
+/** What a condition means, for the dotted word in card text: "Flaky: 25% chance to miss, for 3 s". */
+export const conditionTip = (condition: Condition): string =>
+  `${CONDITION_NAMES[condition]}: ${CONDITION_EFFECTS[condition]()}, for ${secondsOf(CONDITION_TICKS)} s`;
+
+/** The words in card text that name a condition, as they appear there. */
+export const CONDITION_WORDS = /\b(rate-limit(?:s|ed)?|rate limited|flaky|deprecat(?:e|es|ed)|merge conflict)\b/i;
+
+/** Which condition a word matched by CONDITION_WORDS names. */
+export function conditionOfWord(word: string): Condition {
+  const lower = word.toLowerCase();
+  if (lower.startsWith("rate")) return "rate-limited";
+  if (lower.startsWith("deprecat")) return "deprecated";
+  if (lower === "flaky") return "flaky";
+  return "merge-conflict";
+}
+
+/** Card text with `{first}` named: the team's first card (a boost's `first`), or "your ace" when no team is at hand. */
+export const withFirst = (text: string, first?: string): string => text.replace("{first}", first ?? "your ace");
 
 /**
  * A condition as a sentence, for a card with `fullHp` and `ticksLeft` of it to go:
- * "Rate limited: acts 1.5× slower, 2 s left". The seconds round up, so a condition
+ * "Rate limited: 33% slower attacks, 2 s left". The seconds round up, so a condition
  * still on never reads "0 s left".
  */
 export function conditionLine(condition: Condition, ticksLeft: number, fullHp: number): string {

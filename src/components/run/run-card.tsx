@@ -7,6 +7,7 @@ import { priceOf, type RunFighter } from "../../../server/run/rules";
 import { roleOf, type Role } from "../../../server/run/stats";
 import { setsOf, teamSets, TIERS } from "../../../server/run/sets";
 import type { Card } from "../../../server/run/types";
+import { CardText } from "./card-text";
 
 // A card as a run plays it: its role, its four numbers, its ability, its
 // sets and its price. The old face (battle/repo-card.tsx) lists moves, which a run
@@ -98,14 +99,14 @@ export function RunCard({ fighter, team }: { fighter: RunFighter; team: RunFight
 
           <div style={{ margin: "1.6cqw 3cqw 0", padding: "1.2cqw 2cqw", borderRadius: "1.4cqw", background: "#1b1d210f" }}>
             <p className="font-display font-bold" style={{ fontSize: "4cqw", lineHeight: 1.2 }}>{ability?.name ?? "No ability"}</p>
-            <p className="text-[#1b1d21]/75" style={{ fontSize: "3.1cqw", lineHeight: 1.3 }}>{ability?.text ?? ""}</p>
+            <p className="text-[#1b1d21]/75" style={{ fontSize: "3.1cqw", lineHeight: 1.3 }}>{ability && <CardText text={ability.text} />}</p>
           </div>
 
           <ul className="flex flex-col" style={{ margin: "1.2cqw 3cqw 0", gap: "0.8cqw" }}>
             {sets.map(({ set, members, bonus, tier, next }) => (
-              <li key={set} className={`line-clamp-2 ${tier ? "" : "text-[#1b1d21]/55"}`} style={{ fontSize: "3cqw", lineHeight: 1.25 }} title={bonus.tiers.map((each) => `${each.at} cards: ${each.text}`).join(" ")}>
-                <span className="font-semibold">{setName(set)}: {bonus.does} <span className="tabular-nums">{members.length}/{next?.at ?? TIERS[TIERS.length - 1]}</span></span>{" "}
-                {tier ? tier.text : `At ${next?.at ?? TIERS[0]}: ${(next ?? bonus.tiers[0]).text}`}
+              <li key={set} className={`line-clamp-2 ${tier ? "" : "text-[#1b1d21]/55"}`} style={{ fontSize: "3cqw", lineHeight: 1.25 }} title={bonus.tiers.map((each) => `(${each.at}) ${each.text}`).join(" ")}>
+                <span className="font-semibold">{setName(set)} <span className="tabular-nums">{members.length}/{next?.at ?? TIERS[TIERS.length - 1]}</span></span>{" · "}
+                {tier ? `(${tier.at}) ${tier.text}` : `(${(next ?? bonus.tiers[0]).at}) ${(next ?? bonus.tiers[0]).text}`}
               </li>
             ))}
           </ul>
