@@ -43,7 +43,7 @@ export type Stat = "attack" | "guard" | "speed" | "critical" | "luck" | "haste";
  * - `deprecated`: the card loses a thirtieth of its full HP each second (deprecatedLoss).
  * - `flaky`: one hit in four (FLAKY_ODDS) misses.
  *
- * The engine (fight.ts) and the words the screen shows (names.ts `conditionLine`) both
+ * The engine (fight.ts) and the words the screen shows (names.ts `conditionLine` and `conditionTip`) both
  * read the numbers below, so a change to one changes what the player is told.
  */
 export const CONDITIONS = ["merge-conflict", "rate-limited", "deprecated", "flaky"] as const;

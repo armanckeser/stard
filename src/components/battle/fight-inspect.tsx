@@ -10,6 +10,7 @@ import { useFightTick, type FightClock } from "./fight-clock";
 import { momentAt, type CreatureMoment } from "./fight-moment";
 import type { BoardFight } from "./three/board";
 import { CONDITION_COLOR } from "./three/effects/stage";
+import { CardText } from "../run/card-text";
 
 // A creature looked at while the fight plays on, as TFT's unit panel: docked at the
 // side (the bottom on a phone), never over the board's middle, and never a modal.
@@ -120,7 +121,7 @@ function Panel({ creature, team, opponent, onClose, onCover }: { creature: Creat
         <section>
           <h3 className="text-xs font-semibold text-white/60">Ability</h3>
           <p className="font-display text-sm font-semibold">{ability.name}</p>
-          <p className="text-sm text-white/75">{ability.text}</p>
+          <p className="text-sm text-white/75"><CardText text={ability.text} /></p>
         </section>
       )}
       <section>

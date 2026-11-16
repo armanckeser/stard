@@ -36,16 +36,16 @@ function bonus(kind: SetBonus["kind"], does: string, on: Trigger, amounts: reado
 
 /** Each family's bonus: one thing per family, nothing shared. */
 export const FAMILIES: Record<CardType, SetBonus> = {
-  web: bonus("family", "Shield", "start", [0.05, 0.08], (share) => `Starts each fight with a shield of ${percent(share)} of its HP.`, (share) => [{ kind: "shield", aim: "self", share }]),
-  systems: bonus("family", "Extra hit", "third", [0.25, 0.3], (power) => `Every third hit adds another hit of ${percent(power)}.`, (power) => [{ kind: "damage", aim: "foe", power }]),
-  apps: bonus("family", "Guard", "hurt", [0.04, 0.07], (by) => `Each hit it takes adds ${percent(by)} guard.`, (by) => [{ kind: "stat", aim: "self", stat: "guard", by }]),
-  data: bonus("family", "Critical", "start", [0.1, 0.15], (by) => `Lands a critical hit on ${wholePercent(BASE_CRITICAL_ODDS + by)} of its hits, not ${wholePercent(BASE_CRITICAL_ODDS)}.`, (by) => [{ kind: "stat", aim: "self", stat: "luck", by }]),
-  scripts: bonus("family", "Opening hit", "start", [0.25, 0.28], (power) => `As the fight starts, hits every enemy for ${percent(power)} of a hit.`, (power) => [{ kind: "damage", aim: "foes", power }]),
-  docs: bonus("family", "Heal", "third", [0.025, 0.05], (share) => `Every third hit heals it ${percent(share)} of its HP.`, (share) => [{ kind: "heal", aim: "self", share }]),
+  web: bonus("family", "Shield", "start", [0.05, 0.08], (share) => `Fight start: gain a ${percent(share)} HP shield.`, (share) => [{ kind: "shield", aim: "self", share }]),
+  systems: bonus("family", "Extra hit", "third", [0.25, 0.3], (power) => `Every 3rd attack: hit again for ${percent(power)}.`, (power) => [{ kind: "damage", aim: "foe", power }]),
+  apps: bonus("family", "Guard", "hurt", [0.04, 0.07], (by) => `When hit: gain ${percent(by)} guard.`, (by) => [{ kind: "stat", aim: "self", stat: "guard", by }]),
+  data: bonus("family", "Critical", "start", [0.1, 0.15], (by) => `Crit chance ${wholePercent(BASE_CRITICAL_ODDS)} → ${wholePercent(BASE_CRITICAL_ODDS + by)}.`, (by) => [{ kind: "stat", aim: "self", stat: "luck", by }]),
+  scripts: bonus("family", "Opening hit", "start", [0.25, 0.28], (power) => `Fight start: hit all enemies for ${percent(power)}.`, (power) => [{ kind: "damage", aim: "foes", power }]),
+  docs: bonus("family", "Heal", "third", [0.025, 0.05], (share) => `Every 3rd attack: heal ${percent(share)}.`, (share) => [{ kind: "heal", aim: "self", share }]),
 };
 
 /** Every topic's bonus. */
-export const TOPIC: SetBonus = bonus("topic", "Faster", "start", [0.07, 0.09], (by) => `Acts ${percent(by)} more often.`, (by) => [{ kind: "stat", aim: "self", stat: "haste", by }]);
+export const TOPIC: SetBonus = bonus("topic", "Faster", "start", [0.07, 0.09], (by) => `Gain ${percent(by)} speed.`, (by) => [{ kind: "stat", aim: "self", stat: "haste", by }]);
 
 const FAMILY_NAMES: ReadonlySet<string> = new Set(CARD_TYPES);
 

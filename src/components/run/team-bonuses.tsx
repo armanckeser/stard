@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Layers, Sparkles } from "lucide-react";
 import { boostById } from "../../../server/run/boosts";
+import { CardText, firstName } from "./card-text";
 import { setName } from "../../../server/run/names";
 import { teamSets } from "../../../server/run/sets";
 import type { Card } from "../../../server/run/types";
@@ -35,7 +36,7 @@ export function TeamBonuses({ cards, boosts, className = "" }: { cards: Card[]; 
             <Sparkles className="size-3.5 shrink-0 text-[#ffd84d]" aria-hidden />
             <span className="truncate font-semibold">{boost.name}</span>
           </span>
-          {open && <span className="block pl-5 text-white/70">{boost.text}</span>}
+          {open && <span className="block pl-5 text-white/70"><CardText text={boost.text} first={firstName(cards[0]?.fullName)} plain /></span>}
         </span>
       ))}
     </button>

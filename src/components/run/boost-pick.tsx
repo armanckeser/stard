@@ -3,6 +3,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { Clover, Crosshair, Droplets, Eye, Flame, Gauge, HeartHandshake, Repeat, Rocket, RotateCcw, Shield, ShieldHalf, ShieldPlus, Snail, Sparkles, Swords, Target, Timer, TriangleAlert, Wind, type LucideProps } from "lucide-react";
 import { medallion } from "@/components/battle/three/medallion";
 import { boostById, type Boost } from "../../../server/run/boosts";
+import { CardText, firstName } from "./card-text";
 
 // The boost pick, after rounds 2 and 4 (BOOST_ROUNDS): three medallions held over the lit
 // board, as TFT lays out its augments. Each is brass with an enamel field whose colour
@@ -110,6 +111,8 @@ const PICKED_FOR = 420;
 
 type Props = {
   offer: string[];
+  /** The full name of the team's first card, which a boost for the first card names. */
+  first?: string;
   /** Folded away to look at the board; the run's phase holds it (src/lib/run-state.ts). */
   peeking: boolean;
   onPick: (id: string) => void;
@@ -117,7 +120,7 @@ type Props = {
   onPeek: (peeking: boolean) => void;
 };
 
-export function BoostPick({ offer, peeking, onPick, onPeek }: Props) {
+export function BoostPick({ offer, first, peeking, onPick, onPeek }: Props) {
   const [picked, setPicked] = useState<string | null>(null);
   const boosts = offer.flatMap((id) => boostById(id) ?? []);
   const enamels = enamelsOf(boosts);
@@ -163,7 +166,7 @@ export function BoostPick({ offer, peeking, onPick, onPeek }: Props) {
       </div>
       <div className="boost-row" data-waiting={images ? undefined : ""}>
         {boosts.map((boost, index) => (
-          <Medal key={boost.id} boost={boost} image={images?.[index] ?? null} enamel={enamels.get(boost.id) ?? ENAMELS[0]} index={index} state={picked === null ? "open" : picked === boost.id ? "chosen" : "passed"} onPick={() => pick(boost.id)} />
+          <Medal key={boost.id} boost={boost} first={first} image={images?.[index] ?? null} enamel={enamels.get(boost.id) ?? ENAMELS[0]} index={index} state={picked === null ? "open" : picked === boost.id ? "chosen" : "passed"} onPick={() => pick(boost.id)} />
         ))}
       </div>
       <button type="button" className="boost-peek" onClick={() => onPeek(true)} disabled={picked !== null}>
@@ -173,14 +176,14 @@ export function BoostPick({ offer, peeking, onPick, onPeek }: Props) {
   );
 }
 
-function Medal({ boost, image, enamel, index, state, onPick }: { boost: Boost; image: string | null; enamel: string; index: number; state: "open" | "chosen" | "passed"; onPick: () => void }) {
+function Medal({ boost, first, image, enamel, index, state, onPick }: { boost: Boost; first?: string; image: string | null; enamel: string; index: number; state: "open" | "chosen" | "passed"; onPick: () => void }) {
   return (
     <button type="button" className="boost-medal group" data-state={state} style={{ "--order": index } as React.CSSProperties} onClick={onPick} disabled={state !== "open"}>
       <span className="boost-coin" style={{ "--enamel": enamel } as React.CSSProperties}>
         {image ? <img src={image} alt="" draggable={false} /> : <span className="boost-coin-blank" />}
       </span>
       <span className="boost-name">{boost.name}</span>
-      <span className="boost-text">{boost.text}</span>
+      <span className="boost-text"><CardText text={boost.text} first={firstName(first)} plain /></span>
     </button>
   );
 }

@@ -311,7 +311,7 @@ function RunPage() {
         </div>
       )}
 
-      {phase.kind === "boost-pick" && <BoostPick offer={phase.offer.ids} peeking={phase.peeking} onPeek={(peeking) => dispatch({ type: "peek", peeking })} onPick={(id) => dispatch({ type: "pick", id })} />}
+      {phase.kind === "boost-pick" && <BoostPick offer={phase.offer.ids} first={units[0]?.fighter.fullName} peeking={phase.peeking} onPeek={(peeking) => dispatch({ type: "peek", peeking })} onPick={(id) => dispatch({ type: "pick", id })} />}
 
       {!player && (
         <div className="absolute inset-0 z-20 flex flex-col items-center justify-center gap-3 bg-black/45 p-4">
