@@ -1,7 +1,8 @@
 import { seededRandom } from "../../server/battle.ts";
 import { fight } from "../../server/run/fight.ts";
-import { ROUND_GOLD, START_GOLD, WIN_GOLD, BENCH_SIZE, boardLimit, costOf, freeCell, opponentLogin, opponentUnits, shopFor, snapshot, winnerOf, type RunFighter, type Unit } from "../../server/run/rules.ts";
+import { ROUND_GOLD, START_GOLD, WIN_GOLD, BENCH_SIZE, boardLimit, costOf, freeCell, opponentLogin, shopFor, snapshot, winnerOf, type RunFighter, type Unit } from "../../server/run/rules.ts";
 import { checksOf, teamSets } from "../../server/run/sets.ts";
+import { opponentTeam } from "../../server/run/opponent.ts";
 import type { Card, Snapshot } from "../../server/run/types.ts";
 import { poolsFromArguments } from "./pools.ts";
 
@@ -93,7 +94,8 @@ function run(seed: string, strategy: Strategy): Played[] {
     const opponent = opponents.get(login);
     if (!opponent) throw new Error(`No pool file for ${login}.`);
     const mine = snapshot(player.login, round, placedUnits(chooseBoard(owned, limit, strategy)));
-    const theirs = snapshot(login, round, opponentUnits(opponent, round, seed));
+    const team = opponentTeam(opponent, "rookie", round, seed);
+    const theirs = snapshot(login, round, team.units, team.boosts, team.klass);
     const won = winnerOf(fight(mine, theirs, `${player.login}|${login}|${round}|${seed}`)) === 0;
     played.push({ round, mine, won });
     gold += ROUND_GOLD + (won ? WIN_GOLD : 0);

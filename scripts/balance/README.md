@@ -5,6 +5,7 @@ Numbers for a balance change, from the same code the game plays. Run with Node 2
 | Script | Measures |
 |---|---|
 | `node scripts/balance/strength.ts [pools]` | Win-rate points each set bonus adds, 4 cards against 4, at each tier |
+| `node scripts/balance/ramp.ts <folder of pools> [0.9,0.85,...]` | How often a player who builds well wins each round, and a run, against the opponents the game fields; a strength list tries another `OPPONENT_STRENGTH` |
 | `node scripts/balance/boards.ts <pools>` | Check rows per board, how often a board has a live check, and greedy-run win rates at rounds 1, 3 and 5 |
 
 `[pools]` is the player's pool file, then the opponents'. A pool file is the Worker's answer for one account, saved:

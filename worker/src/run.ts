@@ -1,10 +1,11 @@
 import type { Fighter } from "../../server/battle.ts";
 import type { ClassId } from "../../server/character.ts";
 import { BOOST_ROUNDS, boostOffer } from "../../server/run/boosts.ts";
+import { opponentTeam } from "../../server/run/opponent.ts";
 import { fight as runFight } from "../../server/run/fight.ts";
 import {
   LOSSES_TO_END, NoOpponentLeft, OPPONENTS, REROLL_COST, ROUND_GOLD, SHOP_SIZE, START_GOLD, WINS_TO_FINISH, WIN_GOLD,
-  freeCell, inHalf, opponentLogin, opponentUnits, priceOf, shopFor, teamSizeAt, winnerOf, type RunFighter,
+  freeCell, inHalf, opponentLogin, priceOf, shopFor, teamSizeAt, winnerOf, type RunFighter,
 } from "../../server/run/rules.ts";
 import { SAVED_TEAM_VERSION, savedSnapshotAt, savedUnitsAt, type SavedTeam } from "../../server/run/saved-team.ts";
 import type { Card, Fight, FightEvent, Placed, Side, Snapshot } from "../../server/run/types.ts";
@@ -189,7 +190,7 @@ export type Opponent = { login: string; avatarUrl: string | null; character: Sav
 
 /**
  * The team a player meets at a round: a saved team when the run was started from a
- * share link, else a team drafted from a well-known account's stars (opponentUnits).
+ * share link, else a team drafted from a well-known account's stars (opponentTeam, server/run/opponent.ts).
  */
 export async function opponentAt(login: string, round: number, seed: string, against: SavedTeam | null, read: RunDeps["read"], optedOut: readonly string[]): Promise<Opponent> {
   if (against) {
@@ -197,9 +198,9 @@ export async function opponentAt(login: string, round: number, seed: string, aga
     return { login: against.login, avatarUrl: against.avatarUrl, character: against.character, fighters: savedUnitsAt(against, round).map((unit) => unit.fighter), snapshot };
   }
   const opponent = await read(opponentLogin(login, round, seed, optedOut));
-  const units = opponentUnits(opponent, round, seed);
-  const snapshot: Snapshot = { login: opponent.login, round, units: units.map((unit): Placed => ({ card: cardOf(unit.fighter), col: unit.col, row: unit.row })), boosts: [], klass: opponent.character.klass };
-  return { login: opponent.login, avatarUrl: opponent.avatarUrl, character: opponent.character, fighters: units.map((unit) => unit.fighter), snapshot };
+  const { units, boosts, klass } = opponentTeam(opponent, opponent.character.klass, round, seed);
+  const snapshot: Snapshot = { login: opponent.login, round, units: units.map((unit): Placed => ({ card: cardOf(unit.fighter), col: unit.col, row: unit.row })), boosts, klass };
+  return { login: opponent.login, avatarUrl: opponent.avatarUrl, character: { ...opponent.character, klass }, fighters: units.map((unit) => unit.fighter), snapshot };
 }
 
 /** The seed a round's fight is played with, the same on the Play screen. */

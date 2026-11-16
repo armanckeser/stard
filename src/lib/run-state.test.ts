@@ -23,8 +23,8 @@ const PIERCES_TEAM: Unit[] = [{ fighter: PIERCE.team[0], col: 1, row: 0 }];
 
 const play = (state: RunState, ...actions: RunAction[]) => actions.reduce(runReducer, state);
 const begun = (seed: string): RunAction => ({ type: "start", seed, login: "abed" });
-const runRead = (seed: string): RunAction => ({ type: "run-read", seed, player: ABED, against: null, opponent: CHANG, theirs: CHANGS_TEAM });
-const roundRead = (seed: string, number: number): RunAction => ({ type: "round-read", seed, number, opponent: PIERCE, theirs: PIERCES_TEAM });
+const runRead = (seed: string): RunAction => ({ type: "run-read", seed, player: ABED, against: null, opponent: CHANG, theirs: CHANGS_TEAM, theirBoosts: [] });
+const roundRead = (seed: string, number: number): RunAction => ({ type: "round-read", seed, number, opponent: PIERCE, theirs: PIERCES_TEAM, theirBoosts: [] });
 /** Fights the round on the board and lets the fight play out. */
 const fought = (state: RunState): RunState => {
   const fighting = runReducer(state, { type: "fight" });
