@@ -1,5 +1,5 @@
 import { encodeLook } from "../../server/character";
-import { savedUnitsAt, type SavedTeam } from "../../server/run/saved-team";
+import { savedSnapshotAt, savedUnitsAt, type SavedTeam } from "../../server/run/saved-team";
 import type { Snapshot } from "../../server/run/types";
 import { APP_URL, CARD_ORIGIN } from "./published-list";
 import type { Player, Unit } from "./run";
@@ -36,6 +36,6 @@ export async function openTeam(token: string): Promise<SavedTeam> {
 export const teamLink = (token: string) => `${APP_URL}team?t=${token}`;
 
 /** A round against a saved team: the team as it stood then, and its owner shown as the opponent. */
-export function savedRound(saved: SavedTeam, round: number): { opponent: Player; theirs: Unit[] } {
-  return { opponent: { login: saved.login, avatarUrl: saved.avatarUrl, character: saved.character, team: saved.fighters }, theirs: savedUnitsAt(saved, round) };
+export function savedRound(saved: SavedTeam, round: number): { opponent: Player; theirs: Unit[]; theirBoosts: string[] } {
+  return { opponent: { login: saved.login, avatarUrl: saved.avatarUrl, character: saved.character, team: saved.fighters }, theirs: savedUnitsAt(saved, round), theirBoosts: savedSnapshotAt(saved, round).boosts };
 }

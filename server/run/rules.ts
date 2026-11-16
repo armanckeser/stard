@@ -102,7 +102,6 @@ export function opponentLogin(login: string, round: number, seed: string, optedO
   return shuffled(others, `${login.toLowerCase()}|${seed}|opponents`)[(round - 1) % others.length];
 }
 
-const FIRST_ROUND = 1;
 /**
  * The stat points each of the other account's cards fights with in round 1 (BUDGET gives a
  * common 400). Over 2,000 simulated round 1s, armanckeser's ace and the starting gold's buy
@@ -122,35 +121,19 @@ const NUDGES = Array.from({ length: 2 * GUARD_NUDGE + 1 }, (_, i) => (i % 2 === 
  * stay. Only the HP above HP_FLOOR shrinks: that part is the points' share, and shrinking it
  * with the other three keeps the lean roleOf reads, so the card keeps its role and its body.
  */
-export function atOpeningStrength(fighter: RunFighter): RunFighter {
-  const scale = OPENING_STAT_POINTS / BUDGET[fighter.card.rarity];
+export const atOpeningStrength = (fighter: RunFighter): RunFighter => scaledBy(fighter, openingScale(fighter));
+/** What a card's stats are multiplied by to bring it to OPENING_STAT_POINTS. */
+export const openingScale = (fighter: RunFighter) => OPENING_STAT_POINTS / BUDGET[fighter.card.rarity];
+
+/** A card with its stat points times `scale`, keeping its role and body as atOpeningStrength does. */
+export function scaledBy(fighter: RunFighter, scale: number): RunFighter {
+  if (scale === 1) return fighter;
   const shrunk = (stat: number) => Math.round(stat * scale);
   const hp = HP_FLOOR + shrunk(fighter.card.hp - HP_FLOOR);
   const rounded = { ...fighter.card, hp, attack: shrunk(fighter.card.attack), guard: shrunk(fighter.card.guard), speed: shrunk(fighter.card.speed) };
   const role = roleOf(fighter.card);
   const card = NUDGES.map((nudge) => ({ ...rounded, guard: rounded.guard + nudge })).find((candidate) => roleOf(candidate) === role) ?? rounded;
   return { ...fighter, hp: card.hp, attack: card.attack, defense: card.guard, speed: card.speed, card };
-}
-
-/**
- * The other account's team at this round, built the way a player builds one: each round
- * a shop from its stars, one card taken. In round 1 the two cards fight with
- * OPENING_STAT_POINTS each (atOpeningStrength); from round 2 on at their own.
- */
-export function opponentUnits(opponent: Pool<RunFighter>, round: number, seed: string): Unit[] {
-  const drafted = opponent.team.slice(0, 1);
-  for (let r = 1; drafted.length > 0 && drafted.length < teamSizeAt(round); r++) {
-    const [pick] = shopFor(opponent, drafted, r, 0, seed, 1);
-    if (!pick) break;
-    drafted.push(pick);
-  }
-  const team = round === FIRST_ROUND ? drafted.map(atOpeningStrength) : drafted;
-  const units: Unit[] = [];
-  for (const fighter of [...team].sort((x, y) => y.defense - x.defense)) {
-    const cell = freeCell(units, fighter);
-    if (cell) units.push({ fighter, ...cell });
-  }
-  return units;
 }
 
 export const inHalf = (col: number, row: number) => col >= 0 && col < COLS && row >= 0 && row < ROWS;

@@ -17,7 +17,7 @@ import { savedSnapshotAt, type SavedTeam } from "./saved-team";
 export const idOf = (side: Side, fighter: RunFighter) => `${side}:${fighter.fullName}`;
 
 /** A round's opponent and their team at that round. */
-export type Round = { number: number; opponent: Player; theirs: Unit[] };
+export type Round = { number: number; opponent: Player; theirs: Unit[]; theirBoosts: string[] };
 /** What a run keeps from round to round. `bought` is board slots bought on top of the round's limit. */
 export type Run = { player: Player; against: SavedTeam | null; units: Unit[]; bench: (RunFighter | null)[]; bought: number; tally: Tally; gold: number; boosts: string[]; history: Snapshot[]; results: RoundResult[] };
 /** The round's shop and how often it was rerolled. */
@@ -53,8 +53,8 @@ export const NO_RUN: RunState = { seed: "", phase: { kind: "start" }, selected: 
 
 export type RunAction =
   | { type: "start"; seed: string; login: string }
-  | { type: "run-read"; seed: string; player: Player; against: SavedTeam | null; opponent: Player; theirs: Unit[] }
-  | { type: "round-read"; seed: string; number: number; opponent: Player; theirs: Unit[] }
+  | { type: "run-read"; seed: string; player: Player; against: SavedTeam | null; opponent: Player; theirs: Unit[]; theirBoosts: string[] }
+  | { type: "round-read"; seed: string; number: number; opponent: Player; theirs: Unit[]; theirBoosts: string[] }
   | { type: "read-failed"; seed: string; message: string }
   | { type: "retry-round" }
   | { type: "buy"; slot: number }
@@ -149,7 +149,7 @@ function trainerFor(phase: Phase, login: string): Player | null {
 function firstRound(action: Extract<RunAction, { type: "run-read" }>): Phase {
   const units: Unit[] = action.player.team.slice(0, 1).map((fighter) => ({ fighter, col: 1, row: 0 }));
   const run: Run = { player: action.player, against: action.against, units, bench: emptyBench(), bought: 0, tally: NEW_TALLY, gold: START_GOLD, boosts: [], history: [], results: [] };
-  return opened(run, { number: 1, opponent: action.opponent, theirs: action.theirs }, null, action.seed);
+  return opened(run, { number: 1, opponent: action.opponent, theirs: action.theirs, theirBoosts: action.theirBoosts }, null, action.seed);
 }
 
 function opened(run: Run, round: Round, offer: Offer | null, seed: string): Phase {
@@ -160,7 +160,7 @@ function opened(run: Run, round: Round, offer: Offer | null, seed: string): Phas
 function roundRead(state: RunState, action: Extract<RunAction, { type: "round-read" }>): RunState {
   const phase = state.phase;
   if (state.seed !== action.seed || phase.kind !== "loading-round" || phase.number !== action.number) return state;
-  return cleared(state, opened(phase.run, { number: action.number, opponent: action.opponent, theirs: action.theirs }, phase.offer, state.seed));
+  return cleared(state, opened(phase.run, { number: action.number, opponent: action.opponent, theirs: action.theirs, theirBoosts: action.theirBoosts }, phase.offer, state.seed));
 }
 
 function readFailed(state: RunState, action: Extract<RunAction, { type: "read-failed" }>): RunState {
@@ -270,7 +270,7 @@ function fought(phase: Extract<Phase, { kind: "shop" }>, seed: string): Phase {
   const fightSeed = `${run.player.login}|${round.opponent.login}|${round.number}|${seed}`;
   const mine = snapshot(run.player.login, round.number, run.units, run.boosts, run.player.character.klass);
   // A saved team fights with the boosts it had at that round, as the Worker replays it (worker/src/team.ts).
-  const theirs = run.against ? savedSnapshotAt(run.against, round.number) : snapshot(round.opponent.login, round.number, round.theirs, [], round.opponent.character.klass);
+  const theirs = run.against ? savedSnapshotAt(run.against, round.number) : snapshot(round.opponent.login, round.number, round.theirs, round.theirBoosts, round.opponent.character.klass);
   const events = playFight(mine, theirs, fightSeed);
   const winner = winnerOf(events);
   const result: RoundResult = { round: round.number, opponent: round.opponent.login, outcome: winner === 0 ? "won" : winner === 1 ? "lost" : "draw" };
