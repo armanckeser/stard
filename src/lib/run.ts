@@ -10,8 +10,8 @@ import { CARD_ORIGIN } from "./published-list";
 export * from "../../server/run/rules";
 
 /** `supporter` is there, and true, when the player starred Stard. */
-// The npx app reads runs from its own server, with the player's own token (cli/src/run-reads.ts).
-const RUN_ORIGIN = APP_MODE === "local" ? window.location.origin : CARD_ORIGIN;
+// The npx app reads runs and battles from its own server, with the player's own token (cli/src/server.ts).
+export const PLAY_ORIGIN = APP_MODE === "local" ? window.location.origin : CARD_ORIGIN;
 
 /** One of a player's public Lists, offered as a deck: its name, and the slug a pool read names it by. */
 export type DeckChoice = { slug: string; name: string };
@@ -41,7 +41,7 @@ export function fetchPlayer(login: string, forRun?: string, choice: PoolChoice =
 }
 
 async function readPlayer(login: string, forRun: string | undefined, choice: PoolChoice): Promise<Player> {
-  const url = new URL("/api/run/pool", RUN_ORIGIN);
+  const url = new URL("/api/run/pool", PLAY_ORIGIN);
   url.searchParams.set("login", login);
   if (forRun) url.searchParams.set("for", forRun);
   if (choice.deck) url.searchParams.set("deck", choice.deck);
@@ -58,7 +58,7 @@ let optedOut: Promise<string[]> | null = null;
 
 // Read once per page: the Worker caches the answer for an hour anyway.
 function opponentsOptedOut(): Promise<string[]> {
-  optedOut ??= fetch(`${RUN_ORIGIN}/api/run/opponents`)
+  optedOut ??= fetch(`${PLAY_ORIGIN}/api/run/opponents`)
     .then(async (response) => {
       const body = (await response.json()) as { optedOut?: string[]; error?: string };
       if (!response.ok || !body.optedOut) throw new Error(body.error ?? "The opponents couldn't be read.");
