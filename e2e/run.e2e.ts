@@ -143,7 +143,7 @@ test("a round plays from the shop to the next round @smoke", async ({ page }) =>
   await settled(page);
   await drag(page, (await unitSpot(page, name!))!, await cellSpot(page, 2, 1));
   await expectAt(page, name!, 2, 1);
-  await page.getByRole("button", { name: "Fight" }).locator("visible=true").click();
+  await page.getByRole("button", { name: "Fight", exact: true }).locator("visible=true").click();
   await page.getByRole("button", { name: "Skip" }).click();
   await expect(page.getByText(/^Round 1 (won|lost)$|^A draw$/)).toBeVisible();
   await page.getByRole("button", { name: "Continue" }).click();
@@ -210,7 +210,7 @@ test("the last card sells, and Fight waits for a card on the board", async ({ pa
   await drag(page, (await unitSpot(page, aceName()))!, await archiveSpot(page));
   await expect(page.getByLabel("0 of 2 cards on the board").locator("visible=true")).toBeVisible();
   expect(await gold(page)).toBeGreaterThan(before);
-  const fight = page.getByRole("button", { name: "Fight" }).locator("visible=true");
+  const fight = page.getByRole("button", { name: "Fight", exact: true }).locator("visible=true");
   await expect(fight).toBeDisabled();
   // With no checks of your own, the other team's checks still sit at the right edge.
   const theirs = (await page.locator(".checks-right").locator("visible=true").boundingBox())!;
@@ -281,7 +281,7 @@ test("round 2's opponent is read while round 1 is played, so Continue opens roun
   await expect.poll(() => new Set(read).size, { message: "round 2's opponent is read before Continue" }).toBe(3);
   await page.route("**/api/run/pool?*", (route) => route.abort());
 
-  await page.getByRole("button", { name: "Fight" }).locator("visible=true").click();
+  await page.getByRole("button", { name: "Fight", exact: true }).locator("visible=true").click();
   await page.getByRole("button", { name: "Skip" }).click();
   await page.getByRole("button", { name: "Continue" }).click();
 
@@ -308,7 +308,7 @@ test("a whole run plays to its end, with the two boost picks", async ({ page, wo
       onBoard++;
       await expect(page.getByLabel(`${onBoard} of ${limit} cards on the board`).locator("visible=true")).toBeVisible();
     }
-    await page.getByRole("button", { name: "Fight" }).locator("visible=true").click();
+    await page.getByRole("button", { name: "Fight", exact: true }).locator("visible=true").click();
     await page.getByRole("button", { name: "Skip" }).click();
     await page.getByRole("button", { name: "Continue" }).click();
     const ended = page.getByText(/^Run (finished|over)$/);
@@ -359,7 +359,7 @@ test("the end screen names who the run beat, and copies a challenge with the fri
   for (let round = 1; round <= 5 && !(await ended.isVisible()); round++) {
     const about = await page.getByRole("button", { name: /^About / }).evaluateAll((all) => all.map((button) => button.getAttribute("aria-label")!.slice("About ".length)));
     beaten.push(about.find((login) => login !== "abed")!);
-    await page.getByRole("button", { name: "Fight" }).locator("visible=true").click();
+    await page.getByRole("button", { name: "Fight", exact: true }).locator("visible=true").click();
     await page.getByRole("button", { name: "Skip" }).click();
     await expect(page.getByText(`Round ${round} won`)).toBeVisible();
     await page.getByRole("button", { name: "Continue" }).click();
@@ -409,7 +409,7 @@ test("a team link without a friend, or with one that isn't a username, greets no
 async function fightToEnd(page: Page) {
   const ended = page.getByText(/^Run (finished|over)$/);
   for (let round = 1; round <= 12 && !(await ended.isVisible()); round++) {
-    await page.getByRole("button", { name: "Fight" }).locator("visible=true").click();
+    await page.getByRole("button", { name: "Fight", exact: true }).locator("visible=true").click();
     await page.getByRole("button", { name: "Skip" }).click();
     await page.getByRole("button", { name: "Continue" }).click();
     const boost = page.getByRole("dialog", { name: "Pick a boost" });
@@ -419,6 +419,26 @@ async function fightToEnd(page: Page) {
   }
   await expect(ended).toBeVisible();
 }
+
+test("a team save that can't reach the Worker is tried again, and Try again saves it once it can", async ({ page }) => {
+  // Regression guarded: a phone that lost its connection for a moment as the run ended got
+  // "Couldn't save your team." for good, with no team link and no way to try again.
+  test.setTimeout(360_000);
+  let online = false;
+  let tries = 0;
+  await page.route("**/api/run/team", (route) => {
+    if (route.request().method() !== "POST") return route.fallback();
+    tries++;
+    return online ? route.fulfill({ json: { token: TOKEN } }) : route.abort("internetdisconnected");
+  });
+  await startRun(page, "", strongAbed);
+  await fightToEnd(page);
+  await expect(page.getByText("Couldn't reach Stard to save your team.")).toBeVisible({ timeout: 20_000 });
+  expect(tries).toBeGreaterThanOrEqual(3);
+  online = true;
+  await page.getByRole("button", { name: "Try again" }).click();
+  await expect(page.getByRole("button", { name: "Challenge a friend" })).toBeEnabled();
+});
 
 test("a challenge goes from one run's end to the friend's own run against that team, each saved with its own seed", async ({ page, context }) => {
   // Regression guarded: a team save that sent no run seed, which the Worker refuses, since it
@@ -470,7 +490,7 @@ test("a creature tapped in a fight opens its panel, and the fight plays on", asy
   // modal; in a fight the panel must leave the fight running.
   await page.route("**/api/run/opponents", (route) => route.fulfill({ json: { optedOut: [] } }));
   await startRun(page, "", toughAbed);
-  await page.getByRole("button", { name: "Fight" }).locator("visible=true").click();
+  await page.getByRole("button", { name: "Fight", exact: true }).locator("visible=true").click();
   // A tap before the board starts the fight picks as the shop does; wait past the fight's 0.6 s lead-in.
   await expect(page.getByRole("button", { name: "Skip" })).toBeVisible();
   await page.waitForTimeout(1_000);
@@ -522,7 +542,7 @@ test("New run clears the last run's opponent, round and shop before the new run 
   await expect(page.getByRole("button", { name: `About ${lastOpponent}` })).toHaveCount(0);
   await expect(page.getByText(/^Round \d+$/)).toHaveCount(0);
   await expect(page.getByRole("button", { name: /^Look at / })).toHaveCount(0);
-  await expect(page.getByRole("button", { name: "Fight" })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Fight", exact: true })).toHaveCount(0);
   await expect(page.getByRole("status").filter({ hasText: "Dealing a new run..." })).toBeVisible();
 
   release();

@@ -15,10 +15,13 @@ import type { Snapshot } from "../../../server/run/types";
 // with the gold line on its edge, who the run beat, the record, the team as shop cards,
 // Challenge a friend as the only filled button, and the rest quiet under it.
 
-type Saving = { state: "saving" } | { state: "saved"; link: string } | { state: "failed"; message: string };
+type Saving = { state: "saving" } | { state: "saved"; link: string } | { state: "failed"; message: string; retry: boolean };
 
 // How long "Copied" shows before the button reads as itself again.
 const COPIED_FOR = 1500;
+// Saves tried again by themselves after a network failure, the first RETRY_AFTER ms later, the next twice that.
+const AUTO_RETRIES = 2;
+const RETRY_AFTER = 2000;
 
 /**
  * The end of a run: who it beat, the record, the team it ended with, and a challenge
@@ -42,16 +45,27 @@ export function RunEnd({ player, seed, rounds, results, team, wins, losses, agai
   onNewRun: () => void;
 }) {
   const [saving, setSaving] = useState<Saving>({ state: "saving" });
+  // A phone that drops its connection for a moment fails the save at once, so a network
+  // failure is tried again on its own before the player is asked to.
+  const [attempt, setAttempt] = useState(0);
   useEffect(() => {
     let live = true;
+    let retry: number | undefined;
     setSaving({ state: "saving" });
     saveTeam(player, seed, rounds, against)
       .then(({ token }) => live && setSaving({ state: "saved", link: teamLink(token) }))
-      .catch((cause: unknown) => live && setSaving({ state: "failed", message: cause instanceof Error && cause.message !== "Failed to fetch" ? cause.message : "Couldn't save your team." }));
+      .catch((cause: unknown) => {
+        if (!live) return;
+        // fetch rejects with a TypeError only when no answer arrived; a refusal from the Worker is final.
+        const unreached = cause instanceof TypeError;
+        if (unreached && attempt < AUTO_RETRIES) retry = window.setTimeout(() => setAttempt(attempt + 1), RETRY_AFTER * (attempt + 1));
+        else setSaving({ state: "failed", message: unreached || !(cause instanceof Error) ? "Couldn't reach Stard to save your team." : cause.message, retry: unreached });
+      });
     return () => {
       live = false;
+      window.clearTimeout(retry);
     };
-  }, [player, seed, rounds, against]);
+  }, [player, seed, rounds, against, attempt]);
   const beaten = beatenIn(results);
   const lead = beatLine(beaten);
   const newRun = <button type="button" className="hud-button run-panel-link" onClick={onNewRun}><RotateCcw className="size-4" /> New run</button>;
@@ -78,7 +92,12 @@ export function RunEnd({ player, seed, rounds, results, team, wins, losses, agai
         {saving.state !== "failed" && newRun}
         <StarStard className="text-white/55 hover:text-white" />
       </div>
-      {saving.state === "failed" && <p className="run-panel-note text-center" role="alert">{saving.message}</p>}
+      {saving.state === "failed" && (
+        <p className="run-panel-note text-center" role="alert">
+          {saving.message}
+          {saving.retry && <> <button type="button" className="underline underline-offset-2 hover:text-white" onClick={() => setAttempt((n) => n + 1)}>Try again</button></>}
+        </p>
+      )}
     </section>
   );
 }
