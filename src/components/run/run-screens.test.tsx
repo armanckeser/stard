@@ -8,6 +8,7 @@ import type { RoundResult } from "@/lib/challenge";
 import { Route as TeamRoute } from "@/routes/team";
 import { Checks } from "./checks";
 import { FpsMeter } from "./fps-meter";
+import { Customize } from "./customize";
 import { RunEnd } from "./run-end";
 
 // The Play screens' words and buttons, drawn without the 3D board. These were browser tests;
@@ -88,6 +89,18 @@ describe("Customize your team", () => {
     const sheet = await screen.findByRole("dialog", { name: "Customize your team" });
     fireEvent.change(sheet.querySelector("#pick-Deck")!, { target: { value: "cli-tools" } });
     expect(asked.some((url) => url.includes("/api/run/pool") && url.includes("deck=cli-tools"))).toBe(true);
+  });
+
+  // Regression guarded: the sheet stayed shut until the stars were read, several seconds on a cold read.
+  it("opens on the Play screen before the stars are read, with the look ready to change", async () => {
+    localStorage.clear();
+    vi.stubGlobal("fetch", () => new Promise<Response>(() => {}));
+    render(<Customize login="annie" />);
+    await act(async () => fireEvent.click(screen.getByRole("button", { name: "Customize your team" })));
+    const sheet = await screen.findByRole("dialog", { name: "Customize your team" });
+    fireEvent.click(screen.getByRole("radio", { name: /Scout/ }));
+    expect(choicesFor("annie")).toMatchObject({ klass: "scout" });
+    expect(sheet.querySelector<HTMLSelectElement>("#pick-Deck")!.disabled).toBe(true);
   });
 });
 
