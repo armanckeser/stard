@@ -5,7 +5,8 @@ import type { Wearer } from "../../../../server/character";
 import type { Condition } from "../../../../server/run/hooks";
 import { CONDITION_NAMES, sourceOf } from "../../../../server/run/names";
 import { BENCH_SIZE } from "../../../../server/run/rules";
-import { COLS, ROWS, TICK_MS, type FightEvent, type Side } from "../../../../server/run/types";
+import { roleOf } from "../../../../server/run/stats";
+import { COLS, ROWS, TICK_MS, type Card, type FightEvent, type Side } from "../../../../server/run/types";
 import { ARCHIVE_DEPTH, ARCHIVE_WIDTH, buildArchive, type Archive } from "./archive";
 import { buildCreature, type Creature } from "./creature";
 import { playFired, SHIELD_KEY, type EffectActor, type EffectStage } from "./effects";
@@ -84,7 +85,15 @@ const POP_LIFE = 900;
 const BAR_WIDTH = 0.84;
 /** Seconds from a ranged card's ability hit to its number: when a melee lunge lands, which effects/damage.ts times its shard to. */
 const ABILITY_HIT_LANDS = 0.11;
-const HEAL = "#5be37a";
+/** Diff chips, as GitHub draws a removed and an added line: damage is a red −12, healing a green +12. */
+const REMOVED = { color: "#ffd7d5", chip: "#8e1519" };
+const ADDED = { color: "#d2fedb", chip: "#116329" };
+const CRITICAL = { color: "#3b2300", chip: "#ffd84d" };
+/** A tank lifts this high before it slams down; an assassin dashes this far past the usual reach. */
+const SLAM_LIFT = 0.28;
+const SLAM_TIME = 0.1;
+const DASH_REACH = 0.62;
+const DASH_TIME = 0.06;
 /** How long the HP a hit took stays white on the bar before it drains, and how fast it drains (about 0.3 s). */
 const TRAIL_HOLD = 0.25;
 const TRAIL_DRAIN = 10;
@@ -109,6 +118,11 @@ const EASE_OUT = "cubic-bezier(0.23, 1, 0.32, 1)";
 const NAME_GAP = 0.32;
 const NAME_REPEAT = 2.4;
 
+/** A run card's role (a plain battle's fighters have no card, and strike as before). */
+const roleOfUnit = (unit: BoardUnit) => {
+  const card = (unit.fighter as { card?: Card }).card;
+  return card ? roleOf(card) : null;
+};
 const world = (x: number, y: number) => new THREE.Vector3((x - (COLS - 1) / 2) * CELL, 0.1, (ROWS - 0.5 - y) * CELL);
 
 // The Drafts shelf: a row of slots along the player's edge of the board, where bought
@@ -752,15 +766,21 @@ export class BoardWorld {
       };
       playFired(this.stage, event.ability, actor.view, reached);
     } else if (event.kind === "shield") {
+      // A shield reads as a required check: ✓ when one goes up, a red ✗ when it is broken.
+      const status = actor.shield === 0 && event.shield > 0 ? "✓" : actor.shield > 0 && event.shield === 0 ? "✗" : null;
       actor.shield = event.shield;
       this.fill(actor);
+      if (status && !quick && this.now - (actor.named.get(status) ?? -Infinity) > NAME_GAP) {
+        actor.named.set(status, this.now);
+        this.label(this.over(actor, 0.45), status, status === "✓" ? { ...ADDED, size: 17 } : { ...REMOVED, size: 17 });
+      }
       if (event.shield === 0) this.stage.detach(actor.view, SHIELD_KEY);
     } else if (event.kind === "hp") {
       actor.hp = Math.max(0, Math.min(actor.unit.fighter.hp, actor.hp + event.change));
       this.fill(actor, event.change < 0);
       if (quick) return;
       if (event.change > 0) actor.flash = 0.5;
-      this.label(this.over(actor, 0.25), event.change > 0 ? `+${event.change}` : String(event.change), { color: event.change > 0 ? HEAL : CONDITION_COLOR[event.cause as Condition] ?? "#ff8f93" });
+      this.label(this.over(actor, 0.25), event.change > 0 ? `+${event.change}` : `−${-event.change}`, event.change > 0 ? ADDED : { color: CONDITION_COLOR[event.cause as Condition] ?? "#ff8f93" });
     } else if (event.kind === "condition") {
       const condition = event.condition as Condition;
       actor.badge.visible = event.on && condition in CONDITION_NAMES;
@@ -791,7 +811,7 @@ export class BoardWorld {
           if (event.critical) this.shake = 0.12;
           if (fainted) this.stopped = HIT_STOP;
         }
-        this.label(this.over(target, 0.25), String(event.damage), event.critical ? { color: "#ffd84d", size: 22, pop: 1.5 } : {});
+        this.label(this.over(target, 0.25), `−${event.damage}`, event.critical ? { ...CRITICAL, size: 21, pop: 1.5 } : REMOVED);
       };
       const cast = this.cast;
       const fromAbility = cast !== null && cast.side === event.side && cast.unit === event.unit && cast.t === event.t;
@@ -817,6 +837,25 @@ export class BoardWorld {
           dispose(shot);
           land();
         });
+      } else if (!fromAbility && roleOfUnit(actor.unit) === "tank") {
+        // A tank's hit is a slam: it rises, comes down on the target, and the floor shakes out.
+        const lift = new THREE.Vector3(0, SLAM_LIFT, 0).addScaledVector(away, -WIND_UP);
+        const reach = away.clone().multiplyScalar(REACH * 0.7);
+        this.tween(0, SLAM_TIME, (k) => actor.lunge.copy(lift).multiplyScalar(easeOut(k)));
+        this.tween(SLAM_TIME, ABILITY_HIT_LANDS * 0.7, (k) => actor.lunge.lerpVectors(lift, reach, k * k), () => {
+          land();
+          target.knock.addScaledVector(away, KNOCK);
+          this.floorRing(target.at, "#c9d1d9", 0.3);
+        });
+        this.tween(SLAM_TIME + ABILITY_HIT_LANDS * 0.7, 0.24, (k) => actor.lunge.copy(reach).multiplyScalar(1 - easeOut(k)));
+      } else if (!fromAbility && roleOfUnit(actor.unit) === "assassin") {
+        // An assassin's hit is a dash: no wind-up, in fast and past, and a slash across the target.
+        const reach = away.clone().multiplyScalar(DASH_REACH);
+        this.tween(0, DASH_TIME, (k) => actor.lunge.copy(reach).multiplyScalar(easeOut(k)), () => {
+          land();
+          this.slash(target, away);
+        });
+        this.tween(DASH_TIME, 0.16, (k) => actor.lunge.copy(reach).multiplyScalar(1 - easeOut(k)));
       } else {
         // An ability's lunge lands when effects/damage.ts's shard does, so only a plain hit draws back first.
         const windUp = fromAbility ? 0 : WIND_UP_TIME;
@@ -829,18 +868,52 @@ export class BoardWorld {
     }
   }
 
+  /** A flat ring that opens on the floor around `at` and fades: a tank's slam landing. */
+  private floorRing(at: THREE.Vector3, color: string, life: number) {
+    const material = new THREE.MeshBasicMaterial({ color, transparent: true, depthWrite: false });
+    const ring = new THREE.Mesh(new THREE.RingGeometry(0.3, 0.38, 40), material);
+    ring.rotation.x = -Math.PI / 2;
+    ring.position.copy(at).setY(0.13);
+    this.scene.add(ring);
+    this.tween(0, life, (k) => {
+      ring.scale.setScalar(1 + easeOut(k) * 1.1);
+      material.opacity = 0.8 * (1 - k);
+    }, () => {
+      this.scene.remove(ring);
+      dispose(ring);
+    });
+  }
+
+  /** A thin white arc swept across the target, square to the way the blow came: an assassin's cut. */
+  private slash(target: Actor, away: THREE.Vector3) {
+    const material = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, depthWrite: false, depthTest: false, side: THREE.DoubleSide, blending: THREE.AdditiveBlending });
+    const arc = new THREE.Mesh(new THREE.TorusGeometry(0.42, 0.025, 4, 24, Math.PI * 0.7), material);
+    arc.renderOrder = 5;
+    arc.position.copy(target.at).setY(target.creature.height * SIZE * 0.5);
+    arc.lookAt(arc.position.clone().add(away));
+    arc.rotateZ(Math.PI * 0.65);
+    this.scene.add(arc);
+    this.tween(0, 0.16, (k) => {
+      arc.rotateZ(-0.12);
+      material.opacity = 1 - k * k;
+    }, () => {
+      this.scene.remove(arc);
+      dispose(arc);
+    });
+  }
+
   /** A point `above` over the creature's HP bar, so what is drawn there never covers the bar. */
   private over(actor: Actor, above: number) {
     return actor.at.clone().setY(actor.bar.position.y + above);
   }
 
   /** A number that pops on, rises over the board and fades. With reduced motion it only fades, in place. */
-  private label(at: THREE.Vector3, text: string, style: { color?: string; size?: number; pop?: number }) {
+  private label(at: THREE.Vector3, text: string, style: { color?: string; chip?: string; size?: number; pop?: number }) {
     const point = at.project(this.camera);
     const label = document.createElement("span");
     label.textContent = text;
     const life = 650;
-    label.style.cssText = `position:absolute;left:${(point.x * 0.5 + 0.5) * 100}%;top:${(-point.y * 0.5 + 0.5) * 100}%;transform:translate(-50%,-100%);pointer-events:none;z-index:5;font:700 ${style.size ?? 15}px/1.2 var(--font-display, system-ui);color:${style.color ?? "#fff"};text-shadow:0 1px 0 #000,0 0 6px #000`;
+    label.style.cssText = `position:absolute;left:${(point.x * 0.5 + 0.5) * 100}%;top:${(-point.y * 0.5 + 0.5) * 100}%;transform:translate(-50%,-100%);pointer-events:none;z-index:5;font:700 ${style.size ?? 15}px/1.2 var(--font-display, system-ui);color:${style.color ?? "#fff"};${style.chip ? `background:${style.chip};padding:0 6px;border-radius:6px;font-family:var(--font-mono, ui-monospace, monospace);box-shadow:0 1px 3px #0008` : "text-shadow:0 1px 0 #000,0 0 6px #000"}`;
     this.host.append(label);
     this.labels.add(label);
     const pop = style.pop ?? 1.25;
