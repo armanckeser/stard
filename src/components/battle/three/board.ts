@@ -6,7 +6,7 @@ import type { Condition } from "../../../../server/run/hooks";
 import { CONDITION_NAMES, sourceOf } from "../../../../server/run/names";
 import { BENCH_SIZE } from "../../../../server/run/rules";
 import { roleOf } from "../../../../server/run/stats";
-import { COLS, ROWS, TICK_MS, type FightEvent, type Side } from "../../../../server/run/types";
+import { COLS, ROWS, TICK_MS, type Card, type FightEvent, type Side } from "../../../../server/run/types";
 import { ARCHIVE_DEPTH, ARCHIVE_WIDTH, buildArchive, type Archive } from "./archive";
 import { buildCreature, type Creature } from "./creature";
 import { playFired, SHIELD_KEY, type EffectActor, type EffectStage } from "./effects";
@@ -118,6 +118,11 @@ const EASE_OUT = "cubic-bezier(0.23, 1, 0.32, 1)";
 const NAME_GAP = 0.32;
 const NAME_REPEAT = 2.4;
 
+/** A run card's role (a plain battle's fighters have no card, and strike as before). */
+const roleOfUnit = (unit: BoardUnit) => {
+  const card = (unit.fighter as { card?: Card }).card;
+  return card ? roleOf(card) : null;
+};
 const world = (x: number, y: number) => new THREE.Vector3((x - (COLS - 1) / 2) * CELL, 0.1, (ROWS - 0.5 - y) * CELL);
 
 // The Drafts shelf: a row of slots along the player's edge of the board, where bought
@@ -832,7 +837,7 @@ export class BoardWorld {
           dispose(shot);
           land();
         });
-      } else if (!fromAbility && roleOf(actor.unit.fighter.card) === "tank") {
+      } else if (!fromAbility && roleOfUnit(actor.unit) === "tank") {
         // A tank's hit is a slam: it rises, comes down on the target, and the floor shakes out.
         const lift = new THREE.Vector3(0, SLAM_LIFT, 0).addScaledVector(away, -WIND_UP);
         const reach = away.clone().multiplyScalar(REACH * 0.7);
@@ -840,10 +845,10 @@ export class BoardWorld {
         this.tween(SLAM_TIME, ABILITY_HIT_LANDS * 0.7, (k) => actor.lunge.lerpVectors(lift, reach, k * k), () => {
           land();
           target.knock.addScaledVector(away, KNOCK);
-          this.ring(target.at, "#c9d1d9", 0.3);
+          this.floorRing(target.at, "#c9d1d9", 0.3);
         });
         this.tween(SLAM_TIME + ABILITY_HIT_LANDS * 0.7, 0.24, (k) => actor.lunge.copy(reach).multiplyScalar(1 - easeOut(k)));
-      } else if (!fromAbility && roleOf(actor.unit.fighter.card) === "assassin") {
+      } else if (!fromAbility && roleOfUnit(actor.unit) === "assassin") {
         // An assassin's hit is a dash: no wind-up, in fast and past, and a slash across the target.
         const reach = away.clone().multiplyScalar(DASH_REACH);
         this.tween(0, DASH_TIME, (k) => actor.lunge.copy(reach).multiplyScalar(easeOut(k)), () => {
@@ -864,7 +869,7 @@ export class BoardWorld {
   }
 
   /** A flat ring that opens on the floor around `at` and fades: a tank's slam landing. */
-  private ring(at: THREE.Vector3, color: string, life: number) {
+  private floorRing(at: THREE.Vector3, color: string, life: number) {
     const material = new THREE.MeshBasicMaterial({ color, transparent: true, depthWrite: false });
     const ring = new THREE.Mesh(new THREE.RingGeometry(0.3, 0.38, 40), material);
     ring.rotation.x = -Math.PI / 2;
