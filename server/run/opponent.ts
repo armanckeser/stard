@@ -1,7 +1,7 @@
 import { CLASS_IDS, type ClassId } from "../character.ts";
 import { BOOST_ROUNDS, boostOffer } from "./boosts.ts";
-import { BENCH_SIZE, REROLL_COST, ROUND_GOLD, START_GOLD, WIN_GOLD, openingScale, costOf, freeCell, scaledBy, shopFor, shuffled, teamSizeAt, type Pool, type RunFighter, type Unit } from "./rules.ts";
-import { teamSets } from "./sets.ts";
+import { BENCH_SIZE, REROLL_COST, ROUND_GOLD, SLOT_COST, START_GOLD, WIN_GOLD, boardLimit, openingScale, costOf, freeCell, scaledBy, shopFor, shuffled, type Pool, type RunFighter, type Unit } from "./rules.ts";
+import { TIERS, teamSets } from "./sets.ts";
 
 // The team a well-known account fields at a round of someone's run, built the way a
 // player builds one: the same gold, shops, rerolls and boosts, and a class. Pure and
@@ -12,10 +12,11 @@ import { teamSets } from "./sets.ts";
 // so a run starts easy and gets harder (opponent-strength.test.ts measures the ramp).
 
 /** The share of their stats an opponent's cards fight with, by round; from the last entry on, that one. */
-// Measured with scripts/balance/ramp.ts on the 12 opponents' and the owner's live pools
-// (2026-11-15), a player who builds well wins 84% of round 1s, 78%, 72%, 62%, then 58%,
-// and 57% of runs. A team built like the player's at full strength wins about half.
-export const OPPONENT_STRENGTH: readonly number[] = [0.9, 0.85, 0.91, 0.94, 0.96];
+// Tuned on real play (scripts/balance/replay.ts, 2026-11-18): the 11 saved teams of runs that
+// reached round 5, nearly all won 5-0 at the old strengths, win 90% of round 1s, then 80%,
+// 66%, 68% and 53%, about 56% of runs. draftTeam builds weaker teams than a person does, so
+// ramp.ts shows lower numbers (85% of round 1s down to 24%).
+export const OPPONENT_STRENGTH: readonly number[] = [0.9, 0.88, 0.97, 1.1, 1.25];
 
 /** Rerolls an opponent spends in a round before it stops looking. */
 const REROLLS = 2;
@@ -25,7 +26,7 @@ const CHECK_WEIGHT = 100;
 export type OpponentTeam = { units: Unit[]; boosts: string[]; klass: ClassId };
 
 const statTotal = (fighter: RunFighter) => fighter.card.hp + fighter.card.attack + fighter.card.guard + fighter.card.speed;
-const liveChecks = (fighters: RunFighter[]) => teamSets({ units: fighters.map((fighter) => ({ card: fighter.card, col: 0, row: 0 })) }).filter((entry) => entry.tier).length;
+const liveChecks = (fighters: RunFighter[]) => teamSets({ units: fighters.map((fighter) => ({ card: fighter.card, col: 0, row: 0 })) }).reduce((sum, entry) => sum + (entry.tier ? entry.tier.at / TIERS[0] : 0), 0);
 const worth = (board: RunFighter[]) => liveChecks(board) * CHECK_WEIGHT + board.reduce((sum, fighter) => sum + costOf(fighter) + statTotal(fighter) / 10_000, 0);
 
 /** The best `limit` cards of `owned` for a board, picked one at a time; the ace always plays. */
@@ -45,22 +46,35 @@ export function opponentClass(login: string, klass: ClassId, seed: string): Clas
   return shuffled(CLASS_IDS.filter((id) => id !== "rookie"), `${login.toLowerCase()}|${seed}|class`)[0];
 }
 
-/** The board and boosts a player who builds well has at `round`: buying for live checks, then price, with up to REROLLS a round. */
+/**
+ * The board and boosts a player who builds well has at `round`: buying for live checks, then
+ * price, with up to REROLLS a round, and a board slot whenever a card is there to fill it.
+ */
 export function draftTeam(opponent: Pool<RunFighter>, round: number, seed: string): { board: RunFighter[]; boosts: string[] } {
   const owned = opponent.team.slice(0, 1);
   const boosts: string[] = [];
   let gold = START_GOLD;
+  let bought = 0;
   for (let r = 1; r <= round && owned.length > 0; r++) {
-    const limit = teamSizeAt(r);
     let rerolls = 0;
     for (;;) {
+      const limit = boardLimit(r, bought);
       const board = bestBoard(owned, limit);
+      // A sale refunds the full price, so a card that wouldn't play is sold for gold.
+      for (const fighter of owned.filter((card) => !board.includes(card))) {
+        owned.splice(owned.indexOf(fighter), 1);
+        gold += costOf(fighter);
+      }
       const shop = shopFor(opponent, owned, r, rerolls, seed).filter((fighter) => costOf(fighter) <= gold);
       const gain = (fighter: RunFighter) => worth(bestBoard([...owned, fighter], limit)) - worth(board);
       const [pick] = shop.filter((fighter) => gain(fighter) > 0).sort((x, y) => gain(y) - gain(x));
+      const slotFills = shop.some((fighter) => costOf(fighter) <= gold - SLOT_COST);
       if (pick && owned.length < limit + BENCH_SIZE) {
         owned.push(pick);
         gold -= costOf(pick);
+      } else if (gold >= SLOT_COST && boardLimit(r, bought + 1) > limit && slotFills) {
+        bought++;
+        gold -= SLOT_COST;
       } else if (rerolls < REROLLS && gold > REROLL_COST) {
         rerolls++;
         gold -= REROLL_COST;
@@ -69,7 +83,7 @@ export function draftTeam(opponent: Pool<RunFighter>, round: number, seed: strin
     if (r < round && (BOOST_ROUNDS as readonly number[]).includes(r)) boosts.push(...boostOffer(`${opponent.login}|${seed}|${r}`, boosts).slice(0, 1));
     gold += ROUND_GOLD + WIN_GOLD;
   }
-  return { board: bestBoard(owned, teamSizeAt(round)), boosts };
+  return { board: bestBoard(owned, boardLimit(round, bought)), boosts };
 }
 
 /** The opponent's team at `round` of the run seeded `seed`: drafted like a player's, at OPPONENT_STRENGTH. */

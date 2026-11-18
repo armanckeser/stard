@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { OPPONENT_STRENGTH, opponentClass, opponentTeam } from "./opponent.ts";
-import { teamSizeAt, type RunFighter } from "./rules.ts";
+import { BOARD_MAX, teamSizeAt, type RunFighter } from "./rules.ts";
 import { roleOf } from "./stats.ts";
 import { card } from "./testbed.ts";
 import type { Card } from "./types.ts";
@@ -22,11 +22,18 @@ const at = (round: number, ace?: Partial<Card>) => opponentTeam(teamWith(ace), "
 const aceOf = (round: number, ace?: Partial<Card>) => at(round, ace).units.find((unit) => unit.fighter.fullName === "greendale/dreamatorium")!.fighter.card;
 
 describe("an opponent's team", () => {
-  it("fields as many cards as the round allows, the ace among them", () => {
+  it("fields at least as many cards as the round allows, the ace among them", () => {
     for (const round of [1, 2, 3, 5]) {
-      expect(at(round).units).toHaveLength(teamSizeAt(round));
+      expect(at(round).units.length).toBeGreaterThanOrEqual(teamSizeAt(round));
+      expect(at(round).units.length).toBeLessThanOrEqual(BOARD_MAX);
       expect(aceOf(round)).toBeDefined();
     }
+  });
+
+  // Regression guarded: players buy board slots and field 6 or 7 cards by round 5, while
+  // opponents stopped at the round's 5, so a player who bought slots won every late round.
+  it("buys a board slot with spare gold, as a player does", () => {
+    expect(at(5).units.length).toBeGreaterThan(teamSizeAt(5));
   });
 
   it("is the same team for the same run, so the Play screen and the Worker agree", () => {
