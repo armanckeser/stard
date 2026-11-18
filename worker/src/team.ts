@@ -7,6 +7,7 @@ import { choiceIn } from "./battle.ts";
 import { LOGIN } from "./cards.ts";
 import type { CountEvent } from "./events.ts";
 import type { OptOuts } from "./no-play.ts";
+import { receiptPool } from "./pool.ts";
 import { seal } from "./sealed.ts";
 import { shortened, type TeamLinks } from "./team-links.ts";
 import {
@@ -22,7 +23,7 @@ import {
 // An account that opted out of being played against (worker/src/no-play.ts) gets no
 // team link, and a link to its team stops opening once it opts out.
 //
-//   POST /api/run/team {login, seed, rounds, against?, deck?, ace?, look?}  the team's link token (short id or sealed), and the team
+//   POST /api/run/team {login, seed, rounds, against?, deck?, ace?, look?, receipt?}  the team's link token (short id or sealed), and the team
 //   GET  /api/run/team?t=<token>                  the team, once the token checks out
 //   GET  /team?t=<token>[&to=<friend>]            the app's page, with the team's link-preview tags
 //
@@ -32,6 +33,8 @@ import {
 // `against` is the token of the saved team the run was played against, if it was.
 // `deck` and `ace` are what the run's pool was dealt with (worker/src/battle.ts), if any.
 // `look` is `{class, look}`, the character's class and look as picked in the Play screen.
+// `receipt`, and a round's `receipt`, are the player's and that round's opponent's pools as
+// the run read them (worker/src/pool.ts), so the replay fights the cards the run fought.
 
 export const TEAM_PATH = /^\/api\/run\/team$/;
 export const TEAM_PAGE_PATH = /^\/team\/?$/;
@@ -42,6 +45,8 @@ const MAX_ROUNDS = 20;
 const CACHE_SECONDS = 86400;
 // newRunSeed's is 32 characters; this only bounds what a request may send.
 const MAX_SEED_CHARS = 64;
+// A team carries a pool receipt for each round, each some 12,000 characters.
+const MAX_BODY_CHARS = 512 * 1024;
 // encodeLook's code is a few dozen characters; this only bounds what a request may send.
 const MAX_LOOK_CHARS = 200;
 
@@ -52,7 +57,9 @@ const MAX_LOOK_CHARS = 200;
  */
 const mostSlotsBy = (round: number) => Math.floor((START_GOLD + (round - 1) * (ROUND_GOLD + WIN_GOLD)) / SLOT_COST);
 
-type PlayedRound = { units: { repo: string; col: number; row: number }[]; boosts: string[] };
+type PlayedRound = { units: { repo: string; col: number; row: number }[]; boosts: string[]; receipt?: string };
+
+const stringOrNone = (value: unknown) => (typeof value === "string" ? value : undefined);
 
 function roundIn(value: unknown, number: number): PlayedRound {
   const round = typeof value === "object" && value !== null ? (value as Record<string, unknown>) : {};
@@ -64,7 +71,7 @@ function roundIn(value: unknown, number: number): PlayedRound {
     if (typeof cell.repo !== "string") throw new RunRefused(`A card in round ${number} has no repo.`, BAD_REQUEST);
     return { repo: cell.repo, col: integer(cell.col, "col"), row: integer(cell.row, "row") };
   });
-  return { units, boosts: boosts as string[] };
+  return { units, boosts: boosts as string[], receipt: stringOrNone(round.receipt) };
 }
 
 function roundsIn(value: unknown): PlayedRound[] {
@@ -122,7 +129,9 @@ async function saveTeam(body: Record<string, unknown>, deps: RunDeps, key: strin
   // Asked before the stars are read, so a blocked account's are never read.
   const ownOptOut = await deps.optedOut([login]);
   if (ownOptOut.length > 0) throw new RunRefused(`${login} has asked not to be played against, so their team gets no link.`, REFUSED);
-  const [player, optedOut] = await Promise.all([deps.read(login, choice), deps.optedOut(OPPONENTS), against ? playableTeam(against, login, deps.optedOut) : null]);
+  // A pool the browser fought with comes back as its receipt; without one, the pool is read again.
+  const readWith = (receipt: string | undefined): RunDeps["read"] => async (account, picked) => (await receiptPool(receipt, key, account)) ?? deps.read(account, picked);
+  const [player, optedOut] = await Promise.all([readWith(stringOrNone(body.receipt))(login, choice), deps.optedOut(OPPONENTS), against ? playableTeam(against, login, deps.optedOut) : null]);
   const day = new Date(deps.now).toISOString().slice(0, 10);
 
   const rounds: SavedRound[] = [];
@@ -133,7 +142,7 @@ async function saveTeam(body: Record<string, unknown>, deps: RunDeps, key: strin
     if (wins >= WINS_TO_FINISH || losses >= LOSSES_TO_END) throw new RunRefused(`The run was over before round ${number}.`, REFUSED);
     const checked = checkedRound(player.team, player.login, round, number, rounds.at(-1)?.boosts ?? []);
     const mine: Snapshot = { login: player.login, round: number, units: checked.units.map((unit) => ({ card: player.team[unit.fighter].card, col: unit.col, row: unit.row })), boosts: checked.boosts, klass: look?.klass ?? player.character.klass };
-    const opponent = await opponentAt(player.login, number, seed, against, deps.read, optedOut);
+    const opponent = await opponentAt(player.login, number, seed, against, readWith(round.receipt), optedOut);
     const winner = winnerOf(fight(mine, opponent.snapshot, fightSeed(player.login, opponent.login, number, seed)));
     if (winner === 0) wins++;
     if (winner === 1) losses++;
@@ -164,7 +173,7 @@ export async function teamResponse(request: Request, url: URL, deps: RunDeps): P
   if (request.method !== "POST" && request.method !== "GET") return json({ error: "Save a team with POST, read one with GET." }, 405);
   if (!deps.key) return json({ error: "Runs aren't set up on this server yet." }, 503);
   try {
-    if (request.method === "POST") return json(await saveTeam(await readBody(request), deps, deps.key), 200);
+    if (request.method === "POST") return json(await saveTeam(await readBody(request, MAX_BODY_CHARS), deps, deps.key), 200);
     const team = await openTeam(url.searchParams.get("t") ?? "", deps.key, deps.links);
     // Opened to be looked at or played against by anyone, so the owner's opt-out applies.
     await playableTeam(team, "", deps.optedOut);

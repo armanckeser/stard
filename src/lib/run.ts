@@ -9,7 +9,6 @@ import { CARD_ORIGIN } from "./published-list";
 
 export * from "../../server/run/rules";
 
-/** `supporter` is there, and true, when the player starred Stard. */
 // The npx app reads runs and battles from its own server, with the player's own token (cli/src/server.ts).
 export const PLAY_ORIGIN = APP_MODE === "local" ? window.location.origin : CARD_ORIGIN;
 
@@ -18,10 +17,12 @@ export type DeckChoice = { slug: string; name: string };
 /** What a pool was dealt with: a deck (a List's slug) and an ace (owner/name), as the Worker honoured them. */
 export type PoolChoice = { deck?: string; ace?: string };
 /**
+ * `supporter` is there, and true, when the player starred Stard. `receipt` is the pool
+ * sealed by the Worker (worker/src/pool.ts), sent back when a team is saved.
  * `choice` is what the pool was dealt with; `decks` the player's public Lists and `aces` the
  * repos they may lead with (a Worker from before the Customize sheet sends none of the three).
  */
-export type Player = { login: string; avatarUrl: string | null; supporter?: true; character: Character & { level: number }; team: RunFighter[]; choice?: PoolChoice; decks?: DeckChoice[]; aces?: string[] };
+export type Player = { login: string; avatarUrl: string | null; supporter?: true; character: Character & { level: number }; team: RunFighter[]; choice?: PoolChoice; decks?: DeckChoice[]; aces?: string[]; receipt?: string };
 
 // One read per account and day for the page, so the first opponent can be read while
 // the player's own cards are (a cold read is several seconds each), and a new run reads

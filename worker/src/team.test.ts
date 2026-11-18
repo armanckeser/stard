@@ -1,10 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { Fighter } from "../../server/battle.ts";
 import { defaultCharacter, defaultLook, encodeLook } from "../../server/character.ts";
-import { OPPONENTS, type RunFighter } from "../../server/run/rules.ts";
+import { OPPONENTS, opponentLogin, type RunFighter } from "../../server/run/rules.ts";
 import { rarityOf } from "../../server/run/stats.ts";
 import type { Card } from "../../server/run/types.ts";
 import type { RunPool } from "./battle.ts";
+import { withReceipt } from "./pool.ts";
 import { runResponse, type RunDeps } from "./run.ts";
 import { fakeGitHubWhere } from "./fake-github.test-helper.ts";
 import type { TeamLinks } from "./team-links.ts";
@@ -178,6 +179,32 @@ describe("POST /api/run/team", () => {
     const { status } = await post({ login: PLAYER, rounds }, depsFor({ [PLAYER]: STRONG }, reads));
     expect(status).toBe(200);
     expect(reads.slice(1)).toEqual(runOpponents);
+  });
+
+  const receiptFor = async (pool: RunPool, key = KEY) => ((await (await withReceipt(Response.json(pool), key)).json()) as { receipt: string }).receipt;
+
+  it("replays the run against the pools it fought, when the pools read now have changed", async () => {
+    // Regression guarded: the edge cache served the run one pool and the replay a newer one,
+    // so the replay's record differed and a finished run got no team link (#149).
+    const deps = depsFor({ [PLAYER]: WEAK, ...Object.fromEntries(OPPONENTS.map((login) => [login, STRONG])) });
+    const rounds = await Promise.all(Array.from({ length: 5 }, async (_, i) => ({ ...aceOnly(), receipt: await receiptFor(poolOf(opponentLogin(PLAYER, i + 1, RUN_SEED, []), WEAK)) })));
+    const receipt = await receiptFor(poolOf(PLAYER, STRONG));
+
+    expect((await post({ login: PLAYER, rounds }, deps)).status).toBe(422);
+    const { status, body } = await post({ login: PLAYER, receipt, rounds }, deps);
+    expect(status).toBe(200);
+    expect(body.team).toMatchObject({ wins: 5, losses: 0 });
+    expect(body.team.fighters[0].card.attack).toBe(400);
+  });
+
+  it("reads a pool again when its receipt is another account's or wasn't signed with the Worker's key", async () => {
+    const deps = depsFor({ [PLAYER]: WEAK });
+    const rounds = Array.from({ length: 5 }, () => aceOnly());
+    for (const receipt of [await receiptFor(poolOf(CHALLENGER, STRONG)), await receiptFor(poolOf(PLAYER, STRONG), "another-key")]) {
+      const { status, body } = await post({ login: PLAYER, receipt, rounds }, deps);
+      expect(status).toBe(422);
+      expect(body.error).toBe("The run was over before round 4.");
+    }
   });
 
   it("refuses a team without its run's seed", async () => {

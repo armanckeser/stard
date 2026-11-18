@@ -273,7 +273,7 @@ function fought(phase: Extract<Phase, { kind: "shop" }>, seed: string): Phase {
   const theirs = run.against ? savedSnapshotAt(run.against, round.number) : snapshot(round.opponent.login, round.number, round.theirs, round.theirBoosts, round.opponent.character.klass);
   const events = playFight(mine, theirs, fightSeed);
   const winner = winnerOf(events);
-  const result: RoundResult = { round: round.number, opponent: round.opponent.login, outcome: winner === 0 ? "won" : winner === 1 ? "lost" : "draw" };
+  const result: RoundResult = { round: round.number, opponent: round.opponent.login, outcome: winner === 0 ? "won" : winner === 1 ? "lost" : "draw", receipt: round.opponent.receipt };
   const fight: BoardFight = { key: `${fightSeed}|${run.tally.wins}|${run.tally.losses}`, ids: [run.units.map((unit) => idOf(0, unit.fighter)), round.theirs.map((unit) => idOf(1, unit.fighter))], events };
   return { kind: "fighting", run: { ...run, history: [...run.history, mine], results: [...run.results, result] }, round, fight, winner };
 }

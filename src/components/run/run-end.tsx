@@ -52,7 +52,7 @@ export function RunEnd({ player, seed, rounds, results, team, wins, losses, agai
     let live = true;
     let retry: number | undefined;
     setSaving({ state: "saving" });
-    saveTeam(player, seed, rounds, against)
+    saveTeam(player, seed, rounds, results.map((result) => result.receipt), against)
       .then(({ token }) => live && setSaving({ state: "saved", link: teamLink(token) }))
       .catch((cause: unknown) => {
         if (!live) return;
@@ -65,7 +65,7 @@ export function RunEnd({ player, seed, rounds, results, team, wins, losses, agai
       live = false;
       window.clearTimeout(retry);
     };
-  }, [player, seed, rounds, against, attempt]);
+  }, [player, seed, rounds, results, against, attempt]);
   const beaten = beatenIn(results);
   const lead = beatLine(beaten);
   const newRun = <button type="button" className="hud-button run-panel-link" onClick={onNewRun}><RotateCcw className="size-4" /> New run</button>;

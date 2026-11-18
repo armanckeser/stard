@@ -339,9 +339,9 @@ function choiceIn(body: Record<string, unknown>): Choice {
   return { kind: "place", card: integer(cell.card, "place.card"), col: integer(cell.col, "place.col"), row: integer(cell.row, "place.row") };
 }
 
-export async function readBody(request: Request): Promise<Record<string, unknown>> {
+export async function readBody(request: Request, maxChars = MAX_BODY_CHARS): Promise<Record<string, unknown>> {
   const text = await request.text();
-  if (text.length > MAX_BODY_CHARS) throw new RunRefused("That request is too big.", BAD_REQUEST);
+  if (text.length > maxChars) throw new RunRefused("That request is too big.", BAD_REQUEST);
   try {
     const body: unknown = JSON.parse(text);
     if (typeof body === "object" && body !== null && !Array.isArray(body)) return body as Record<string, unknown>;

@@ -1,8 +1,11 @@
 // The end of a run, as words: who the run beat, and the message Challenge a friend
 // copies. A username tells nothing about the person, so no message uses a pronoun.
 
-/** One round of a finished run: who it was against and how it went. */
-export type RoundResult = { round: number; opponent: string; outcome: "won" | "lost" | "draw" };
+/**
+ * One round of a finished run: who it was against and how it went. `receipt` is the pool
+ * the opponent was drafted from (Player.receipt), so a saved team is replayed against it.
+ */
+export type RoundResult = { round: number; opponent: string; outcome: "won" | "lost" | "draw"; receipt?: string };
 
 // More names than this make the line wrap on a phone; the rest are counted.
 const NAMED = 3;

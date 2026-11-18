@@ -250,3 +250,12 @@ it("sceneOf shows nothing of a run before the first one starts", () => {
   const phase: Phase = { kind: "start" };
   expect(sceneOf(phase)).toEqual({ player: null, run: null, round: null, fight: null });
 });
+
+describe("a round's result", () => {
+  it("keeps the receipt of the pool the opponent was drafted from, for the team's save", () => {
+    // Regression guarded: the save's replay read the opponent's pool again, met newer cards, and refused the team (#149).
+    const withReceipt: RunAction = { type: "run-read", seed: "greendale", player: ABED, against: null, opponent: { ...CHANG, receipt: "changs-pool" }, theirs: CHANGS_TEAM, theirBoosts: [] };
+    const after = fought(play(NO_RUN, begun("greendale"), withReceipt)).phase;
+    expect(after.kind === "round-result" && after.run.results[0].receipt).toBe("changs-pool");
+  });
+});
