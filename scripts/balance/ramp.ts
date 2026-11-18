@@ -2,7 +2,7 @@ import { readdirSync } from "node:fs";
 import { join } from "node:path";
 import { CLASS_IDS } from "../../server/character.ts";
 import { fight } from "../../server/run/fight.ts";
-import { draftTeam, opponentTeam, OPPONENT_STRENGTH } from "../../server/run/opponent.ts";
+import { draftTeam, opponentTeam, LEVELS } from "../../server/run/opponent.ts";
 import { LOSSES_TO_END, OPPONENTS, WINS_TO_FINISH, freeCell, opponentLogin, shuffled, snapshot, winnerOf, type Unit, type RunFighter } from "../../server/run/rules.ts";
 import { loadPool } from "./pools.ts";
 
@@ -13,7 +13,7 @@ import { loadPool } from "./pools.ts";
 
 const RUNS = Number(process.env.RUNS ?? 200);
 const [folder, override] = process.argv.slice(2);
-const strength = override ? override.split(",").map(Number) : OPPONENT_STRENGTH;
+const strength = override ? override.split(",").map(Number) : LEVELS[LEVELS.length - 1];
 const pools = readdirSync(folder).filter((name) => name.endsWith(".json")).map((name) => loadPool(join(folder, name)));
 const byLogin = new Map(pools.map((pool) => [pool.login.toLowerCase(), pool]));
 const classes = CLASS_IDS.filter((id) => id !== "rookie");

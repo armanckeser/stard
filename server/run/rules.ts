@@ -64,9 +64,12 @@ const SEED_BYTES = 16;
  * `randomUUID`, which a browser only has on HTTPS, and the Play screen is also opened
  * over plain HTTP on a home network (a phone against the dev server, a self-hosted copy).
  */
-export function newRunSeed(): string {
-  return Array.from(crypto.getRandomValues(new Uint8Array(SEED_BYTES)), (byte) => byte.toString(16).padStart(2, "0")).join("");
+export function newRunSeed(level = 1): string {
+  return `${level}.${Array.from(crypto.getRandomValues(new Uint8Array(SEED_BYTES)), (byte) => byte.toString(16).padStart(2, "0")).join("")}`;
 }
+
+/** The level a run is played at, the digit before the dot of its seed ("2.<hex>"); a seed without one is level 1. */
+export const levelOf = (seed: string): number => Math.max(1, Number(/^(\d)\./.exec(seed)?.[1] ?? 1));
 
 /** Cards from the player's stars that are not on the team. The same run seed, round and reroll show the same cards. */
 export function shopFor<T extends { fullName: string }>(player: Pool<T>, owned: T[], round: number, rerolls: number, seed: string, size = SHOP_SIZE): T[] {
