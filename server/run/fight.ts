@@ -49,6 +49,8 @@ type Unit = {
   role: Role;
   /** Whether an assassin has spent its one leap. */
   leapt: boolean;
+  /** The card an assassin hunts until it falls. */
+  mark?: Unit;
   x: number;
   y: number;
   hp: number;
@@ -282,11 +284,15 @@ function farthest(from: { x: number; y: number }, units: Unit[]): Unit | undefin
 
 /**
  * Who a card goes for. A tank in reach must be hit first (CODEOWNERS: it reviews everything
- * near it). An assassin ignores that and goes for the farthest card (@mention), the back row.
+ * near it). An assassin ignores that and hunts the farthest card (@mention), the back row,
+ * until it falls.
  * Everyone else takes the nearest.
  */
 function targetOf(unit: Unit, enemies: Unit[]): Unit | undefined {
-  if (unit.role === "assassin") return farthest(unit, enemies);
+  if (unit.role === "assassin") {
+    if (!unit.mark || unit.mark.hp <= 0) unit.mark = farthest(unit, enemies);
+    return unit.mark;
+  }
   const tanks = enemies.filter((enemy) => enemy.role === "tank" && apart(unit, enemy) <= unit.card.range);
   return nearest(unit, tanks.length > 0 ? tanks : enemies);
 }

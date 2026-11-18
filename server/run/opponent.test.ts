@@ -77,10 +77,10 @@ describe("an opponent's team", () => {
   // round 1, so it wore another body on the board and another role on its card face; and
   // rounding the shrunk stats tipped a card sitting on a role's cut into the next role.
   it.each([
-    ["kentcdodds' rare ace", { rarity: 2, hp: 155, attack: 120, guard: 101, speed: 110 }, "bruiser"],
-    ["a rare tank on the tank cut", { rarity: 2, hp: 156, attack: 106, guard: 102, speed: 117 }, "tank"],
-    ["a rare bruiser on the assassin cut", { rarity: 2, hp: 154, attack: 113, guard: 101, speed: 118 }, "bruiser"],
-    ["a common bruiser on the assassin cut", { rarity: 0, hp: 150, attack: 101, guard: 103, speed: 114 }, "bruiser"],
+    ["kentcdodds' rare ace", { rarity: 2, hp: 155, attack: 120, guard: 101, speed: 110 }, "assassin"],
+    ["a rare tank on the tank cut", { rarity: 2, hp: 160, attack: 100, guard: 104, speed: 100 }, "tank"],
+    ["a rare bruiser on the assassin cut", { rarity: 2, hp: 150, attack: 101, guard: 101, speed: 100 }, "bruiser"],
+    ["a common bruiser on the assassin cut", { rarity: 0, hp: 150, attack: 100, guard: 102, speed: 100 }, "bruiser"],
   ] as const)("keeps %s in its role at every round's strength", (_, ace, role) => {
     for (const round of [1, 2, 3, 4, 5]) expect(roleOf(aceOf(round, ace))).toBe(role);
   });

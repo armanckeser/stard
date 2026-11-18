@@ -16,14 +16,14 @@ import { TIERS, teamSets } from "./sets.ts";
  * that one), at each level. A run's level is in its seed (levelOf): a browser plays level 1
  * until it wins a run, then level 2.
  */
-// Level 2 is tuned on real play (scripts/balance/replay.ts, 2026-11-18): the 11 saved teams of
-// runs that reached round 5, nearly all won 5-0 at level 1, win 90% of round 1s, then 80%,
-// 66%, 68% and 53%, about 56% of runs. Level 1 is the earlier ramp (ramp.ts on 2026-11-15:
-// a draftTeam player wins 85% down to 52%, 47% of runs). draftTeam builds weaker teams than
-// a person does, so at level 2 ramp.ts shows 85% of round 1s down to 24%.
+// Both levels are tuned on real play (scripts/balance/replay.ts, 2026-11-18): the 11 saved
+// teams of runs that reached round 5. Level 1 keeps the curve they met before roles fought
+// (90%, 83%, 72%, 80%, 84% by round); level 2 wins 90% of round 1s, then 80%, 66%, 68% and
+// 53%, about 56% of runs. Since tanks draw hits and assassins dive, draftTeam's teams do
+// about as well as real ones: ramp.ts shows 73% of runs at level 1 and 44% at level 2.
 export const LEVELS: readonly (readonly number[])[] = [
-  [0.9, 0.85, 0.91, 0.94, 0.96],
-  [0.9, 0.88, 0.97, 1.1, 1.25],
+  [0.87, 0.75, 0.8, 0.77, 0.75],
+  [0.87, 0.78, 0.85, 0.89, 1.03],
 ];
 
 /** The strengths a run seeded `seed` meets. */
