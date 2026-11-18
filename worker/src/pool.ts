@@ -3,6 +3,7 @@ import { gql, poolResponse, type FactsStore, type PoolChoice, type RunPool } fro
 import { DAY, HOUR, cacheKeyFor, readThrough, type CacheDeps, type Lifetime } from "./edge-cache.ts";
 import { cachedPopular, type SearchNodes } from "./popular.ts";
 import { RunRefused } from "./run.ts";
+import { seal, unseal } from "./sealed.ts";
 
 // An account's pool, as the Play screen (GET /api/run/pool) and a run's referee
 // (worker/src/run.ts) read it: one way in, one cache entry, so the two can't drift.
@@ -29,6 +30,31 @@ export function poolReply(login: string, deps: PoolDeps, choice: PoolChoice = {}
   const lifetime = OPPONENT_LOGINS.has(login.toLowerCase()) ? OPPONENT_POOL : PLAYER_POOL;
   const popular = () => cachedPopular((query) => gql<Record<string, SearchNodes>>(deps.token, query), deps.origin, deps);
   return readThrough(cacheKeyFor(url, true), () => poolResponse(url.searchParams, deps.token, popular, deps.facts), lifetime, deps);
+}
+
+// A pool's receipt is the pool sealed with BATTLE_KEY. The browser sends it back when it
+// saves a team, so the replay (worker/src/team.ts) fights the cards the run fought, not
+// a newer read: the edge cache holds a pool per data center and refreshes it while serving the old one.
+const POOL_PURPOSE = "stard-pool";
+
+/** A pool reply with its receipt added, when it is a pool and the Worker has a key. */
+export async function withReceipt(reply: Response, key: string | undefined): Promise<Response> {
+  if (!reply.ok || !key) return reply;
+  const pool = (await reply.clone().json()) as RunPool;
+  const receipted = new Response(JSON.stringify({ ...pool, receipt: await seal(pool, key, POOL_PURPOSE, "deflated") }), reply);
+  receipted.headers.delete("Content-Length");
+  return receipted;
+}
+
+/** The pool a receipt carries, or null when it isn't one of ours or is `login`'s no longer. */
+export async function receiptPool(receipt: string | undefined, key: string, login: string): Promise<RunPool | null> {
+  if (!receipt) return null;
+  try {
+    const pool = (await unseal(receipt, key, POOL_PURPOSE, "deflated")) as RunPool;
+    return pool.login.toLowerCase() === login.toLowerCase() ? pool : null;
+  } catch {
+    return null;
+  }
 }
 
 /**

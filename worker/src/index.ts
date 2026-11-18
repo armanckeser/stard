@@ -8,7 +8,7 @@ import { EVENT_ROUTE, counterFor, eventResponse } from "./events.ts";
 import { GAME_PATH, gameResponse } from "./game.ts";
 import { askGitHub } from "./github-budget.ts";
 import { OPPONENTS_PATH, OptedOut, blockListOf, checkPoolRead, checkTeamRead, opponentsBody, readOptOuts, withBlockList, type OptOuts } from "./no-play.ts";
-import { cachedPool, poolReply, type PoolDeps } from "./pool.ts";
+import { cachedPool, poolReply, withReceipt, type PoolDeps } from "./pool.ts";
 import { RUN_PATH, runResponse, type RunDeps } from "./run.ts";
 import { RUN_PICTURE_PATH, RUN_SHARE_PATH, SHARE_PATH, VERSUS_PATH, runPictureResponse, runSharePage, sharePage, versusResponse } from "./share.ts";
 import { TEAM_PAGE_PATH, TEAM_PATH, teamPage, teamResponse } from "./team.ts";
@@ -162,7 +162,7 @@ export default {
       // Whose run the read is for decides only the check above; everyone shares one cached pool.
       const choice = choiceIn(url.searchParams.get("deck"), url.searchParams.get("ace"));
       if (typeof choice === "string") return json({ error: choice }, 400, 0, OPEN);
-      return poolReply(url.searchParams.get("login") ?? "", pools, choice);
+      return withReceipt(await poolReply(url.searchParams.get("login") ?? "", pools, choice), env.BATTLE_KEY);
     }
     if (card || fight || trainer || versus || runPicture) {
       // Usernames ignore case on GitHub, so a battle's two names are keyed in lower case.
