@@ -63,7 +63,7 @@ export const FLAKY_ODDS = 1 / 4;
  * Open issues stack on a card and never wear off: each costs ISSUE_SHARE of its full HP
  * every DEPRECATED_EVERY ticks, until any heal closes them all.
  */
-export const ISSUE_SHARE = 1 / 100;
+export const ISSUE_SHARE = 1 / 200;
 export const issueLoss = (fullHp: number, issues: number) => Math.max(1, Math.round(fullHp * ISSUE_SHARE * issues));
 
 /** The HP a deprecated card with `fullHp` loses each time the condition bites. */

@@ -2,7 +2,7 @@ import { CLASSES, isClass } from "../character.ts";
 import { abilityById } from "./abilities.ts";
 import { CLASS_EFFECTS } from "./classes.ts";
 import { boostById } from "./boosts.ts";
-import { CONDITION_TICKS, DEPRECATED_EVERY, DEPRECATED_SHARE, deprecatedLoss, FLAKY_ODDS, MERGE_CONFLICT_ODDS, RATE_LIMITED, type Condition, type Effect, type Gate, type Stat, type Trigger } from "./hooks.ts";
+import { CONDITION_TICKS, DEPRECATED_EVERY, DEPRECATED_SHARE, deprecatedLoss, FLAKY_ODDS, ISSUE_SHARE, MERGE_CONFLICT_ODDS, RATE_LIMITED, type Condition, type Effect, type Gate, type Stat, type Trigger } from "./hooks.ts";
 import { bonusOf } from "./sets.ts";
 import { TICK_MS, type Card } from "./types.ts";
 
@@ -41,8 +41,12 @@ const CONDITION_EFFECTS: Record<Condition, (fullHp?: number) => string> = {
 export const conditionTip = (condition: Condition): string =>
   `${CONDITION_NAMES[condition]}: ${CONDITION_EFFECTS[condition]()}, for ${secondsOf(CONDITION_TICKS)} s`;
 
-/** The words in card text that name a condition, as they appear there. */
-export const CONDITION_WORDS = /\b(rate-limit(?:s|ed)?|rate limited|flaky|deprecat(?:e|es|ed)|merge conflict)\b/i;
+/** The words in card text that name a condition, or an open issue, as they appear there. */
+export const CONDITION_WORDS = /\b(rate-limit(?:s|ed)?|rate limited|flaky|deprecat(?:e|es|ed)|merge conflict|open issue)\b/i;
+
+/** What a dotted word in card text means: a condition's tip, or how open issues work. */
+export const tipOfWord = (word: string): string =>
+  /open issue/i.test(word) ? `Open issue: stacks; each costs ${ISSUE_SHARE * PERCENT}% of max HP ${perSecond}, until any heal closes them all` : conditionTip(conditionOfWord(word));
 
 /** Which condition a word matched by CONDITION_WORDS names. */
 export function conditionOfWord(word: string): Condition {

@@ -127,6 +127,32 @@ describe("fightWith hooks", () => {
     for (const ability of fired) expect(own.filter((hit) => hit.t === ability.t)).toHaveLength(2);
   });
 
+  // Regression guarded: a hit only ever reached one card or all of them, and nothing stacked,
+  // so placement and healing had no answer to give.
+  it("stacks open issues that cost more HP the more are open, until a heal closes them all", () => {
+    const opener: Hook = { source: "test:issue", on: "hit", effects: [{ kind: "issue", aim: "foe" }] };
+    const rules = (healer: boolean): Rules => ({ hooks: (snapshot, side) => snapshot.units.map(() => (side === 0 ? [opener] : healer ? [{ source: "test:heal", on: "third", effects: [{ kind: "heal", aim: "self", share: 0.01 }] }] : [])) });
+    const target = card("city-college/wall", { hp: 100_000, attack: 1 });
+    const open = fightWith(rules(false))(...duel(card("greendale/troy"), target), "seed");
+    const counts = of(open, "issues").map((event) => event.issues);
+    expect(counts.slice(0, 3)).toEqual([1, 2, 3]);
+    const bites = of(open, "hp").filter((event) => event.cause === "open-issues").map((event) => -event.change);
+    expect(bites.length).toBeGreaterThan(3);
+    expect(bites.at(-1)).toBeGreaterThan(bites[0]);
+    const healed = fightWith(rules(true))(...duel(card("greendale/troy"), target), "seed");
+    expect(of(healed, "issues").some((event) => event.issues === 0)).toBe(true);
+  });
+
+  it("blasts the target and the enemies next to it, not one two cells away", () => {
+    const blast: Hook = { source: "test:blast", on: "start", effects: [{ kind: "damage", aim: "blast", power: 0.5 }] };
+    const wall = (name: string) => card(`city-college/${name}`, { hp: 100_000, attack: 1 });
+    const theirs = team("city-college", [at(wall("near"), 2), at(wall("beside"), 3), at(wall("far"), 0)]);
+    const events = fightWith(carrying([blast]))(team("greendale", [at(card("greendale/troy"), 1)]), theirs, "seed");
+    const fired = of(events, "ability")[0];
+    expect(fired.targets.sort()).toEqual([0, 1]);
+    expect(of(events, "hit").filter((hit) => hit.side === 0 && hit.t === fired.t).map((hit) => hit.target).sort()).toEqual([0, 1]);
+  });
+
   it("fires a hurt hook only while the card is still standing after the hit", () => {
     const events = fightWith(carrying([{ source: "test:hurt", on: "hurt", effects: [{ kind: "stat", aim: "self", stat: "guard", by: 0.1 }] }]))(...duel(card("greendale/troy", { hp: 100 }), card("city-college/strong", { attack: 400 })), "seed");
     const taken = of(events, "hit").filter((hit) => hit.side === 1);
