@@ -15,7 +15,7 @@ import { cardFor } from "./stats.ts";
 const POOLS = 5;
 const RUNS = 40;
 // By level: level 1 is a browser's first runs, level 2 once it has won one.
-const BANDS: Record<number, Record<number, [number, number]>> = { 1: { 1: [72, 95], 3: [52, 85], 5: [38, 72] }, 2: { 1: [72, 95], 3: [42, 70], 5: [12, 40] } };
+const BANDS: Record<number, Record<number, [number, number]>> = { 1: { 1: [78, 98], 3: [57, 82], 5: [65, 92] }, 2: { 1: [78, 98], 3: [55, 82], 5: [35, 62] } };
 
 const repos = fixtureRepos();
 const pools: Pool<RunFighter>[] = Array.from({ length: POOLS }, (_, p) => ({

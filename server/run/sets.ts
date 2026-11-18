@@ -36,7 +36,7 @@ function bonus(kind: SetBonus["kind"], does: string, on: Trigger, amounts: reado
 
 /** Each family's bonus: one thing per family, nothing shared. */
 export const FAMILIES: Record<CardType, SetBonus> = {
-  web: bonus("family", "Shield", "start", [0.05, 0.08], (share) => `Fight start: gain a ${percent(share)} HP shield.`, (share) => [{ kind: "shield", aim: "self", share }]),
+  web: bonus("family", "Shield", "start", [0.05, 0.09], (share) => `Fight start: gain a ${percent(share)} HP shield.`, (share) => [{ kind: "shield", aim: "self", share }]),
   systems: bonus("family", "Extra hit", "third", [0.25, 0.3], (power) => `Every 3rd attack: hit again for ${percent(power)}.`, (power) => [{ kind: "damage", aim: "foe", power }]),
   apps: bonus("family", "Guard", "hurt", [0.04, 0.07], (by) => `When hit: gain ${percent(by)} guard.`, (by) => [{ kind: "stat", aim: "self", stat: "guard", by }]),
   data: bonus("family", "Critical", "start", [0.1, 0.15], (by) => `Crit chance ${wholePercent(BASE_CRITICAL_ODDS)} → ${wholePercent(BASE_CRITICAL_ODDS + by)}.`, (by) => [{ kind: "stat", aim: "self", stat: "luck", by }]),

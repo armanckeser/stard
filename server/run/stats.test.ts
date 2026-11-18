@@ -114,11 +114,11 @@ describe("roleOf", () => {
 
   // HP points are (hp - 130) / 0.25, so hp 157 is 108 points.
   it.each([
-    { role: "tank", card: melee(157, 100, 120, 105), why: "toughness 228 over damage 205 is 1.11" },
-    { role: "bruiser", card: melee(157, 116, 101, 121), why: "209 over 237 is 0.88" },
+    { role: "tank", card: melee(157, 100, 135, 105), why: "toughness 243 over damage 205 is 1.19" },
+    { role: "bruiser", card: melee(157, 116, 130, 121), why: "238 over 237 is 1.00" },
     { role: "assassin", card: melee(155, 130, 90, 125), why: "190 over 255 is 0.75" },
-    { role: "tank", card: melee(155, 100, 84, 100), why: "184 over 200 is exactly 0.92" },
-    { role: "bruiser", card: melee(155, 100, 70, 100), why: "170 over 200 is exactly 0.85" },
+    { role: "tank", card: melee(155, 100, 124, 100), why: "224 over 200 is exactly 1.12" },
+    { role: "bruiser", card: melee(155, 100, 80, 100), why: "180 over 200 is exactly 0.90" },
   ])("calls a melee card a $role when $why", ({ role, card }) => {
     expect(roleOf(card)).toBe(role);
   });

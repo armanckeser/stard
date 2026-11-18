@@ -57,8 +57,8 @@ describe("setHooks", () => {
   // must still be the 2-card bonus, and at 4 the bigger one on every card.
   it.each([
     [3, 0.05],
-    [4, 0.08],
-    [5, 0.08],
+    [4, 0.09],
+    [5, 0.09],
   ])("gives each of %i cards of a family the shield of %s", (count, share) => {
     const hooks = setHooks(team(Array.from({ length: count }, () => ({ type: "web" }))));
     expect(hooks).toEqual(Array.from({ length: count }, () => [{ source: "set:web", on: "start", effects: [{ kind: "shield", aim: "self", share }] }]));

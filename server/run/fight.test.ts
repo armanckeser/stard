@@ -36,6 +36,21 @@ describe("fight", () => {
     expect(of(events, "move").filter((event) => event.side === 0)).toEqual([]);
   });
 
+  // Regression guarded: every card hit the nearest enemy, so a tank's body and an assassin's
+  // were looks only and where a card stood barely mattered.
+  it("makes a card hit a tank in its reach before a nearer card", () => {
+    const tank = card("city-college/tank", { hp: 200 });
+    const events = fight(team("greendale", [at(card("greendale/far", { range: 3, attack: 1 }), 1)]), team("city-college", [at(card("city-college/near"), 2), at(tank, 2, 1)]), "seed");
+    expect(events.find((event) => event.kind === "hit" && event.side === 0)).toMatchObject({ target: 1 });
+  });
+
+  it("sends an assassin past the front row to the farthest card, in one leap", () => {
+    const assassin = card("greendale/assassin", { attack: 130, speed: 125, guard: 80 });
+    const events = fight(team("greendale", [at(assassin, 0, 1)]), team("city-college", [at(card("city-college/front", { attack: 1 }), 3), at(card("city-college/back", { attack: 1 }), 0, 1)]), "seed");
+    expect(events.find((event) => event.kind === "hit" && event.side === 0)).toMatchObject({ target: 1 });
+    expect(of(events, "move").filter((event) => event.side === 0)).toHaveLength(1);
+  });
+
   it("stops at 45 seconds and gives the fight to the side with more HP left", () => {
     const wall = { attack: 0, guard: 100_000, hp: 5000 };
     const events = fight(...duel(card("greendale/wall", { ...wall, hp: 6000 }), card("city-college/wall", wall)), "seed");

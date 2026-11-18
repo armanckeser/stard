@@ -138,10 +138,12 @@ export function statPoints(repo: CardFacts, now: number): StatPoints {
 export type Role = "tank" | "bruiser" | "assassin" | "ranged";
 
 // Toughness (HP points and guard) over damage (attack and speed). Every card's stats are
-// one budget split with floors and caps, so the ratio stays near 1: on real pools melee
-// cards run 0.82 to 1.0, and these cuts give each role about a quarter, half and quarter.
-const TANK_FROM = 0.92;
-const ASSASSIN_BELOW = 0.85;
+// one budget split with floors and caps, so the ratio stays near 1. These cuts give melee
+// cards about a quarter assassins, half bruisers and a quarter tanks: on the 13 live pools
+// of 2026-11-17 the ratio's quartiles are 0.90 and 1.12 (the earlier 0.85 and 0.92 had
+// drifted to 55% tanks, 9% assassins).
+const TANK_FROM = 1.12;
+const ASSASSIN_BELOW = 0.9;
 
 export function roleOf(card: Card): Role {
   if (card.range > 1) return "ranged";

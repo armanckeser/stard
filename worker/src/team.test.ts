@@ -46,7 +46,7 @@ const poolOf = (login: string, over: Partial<Fighter>): RunPool => ({
   facts: { readAt: new Date(NOW).toISOString(), character: null, ace: null, source: "stars", repos: [] },
 });
 
-const STRONG = { hp: 1000, attack: 400, defense: 100, speed: 100 };
+const STRONG = { hp: 3000, attack: 800, defense: 100, speed: 100 };
 const WEAK = { hp: 50, attack: 5, defense: 5, speed: 5 };
 
 /**
@@ -152,7 +152,7 @@ describe("POST /api/run/team", () => {
     const token = await savedStrongTeam();
     const now = await read(token, depsFor({}));
     const later = await read(token, { ...depsFor({ [PLAYER]: { attack: 1 } }), now: NOW + WEEK, newSeed: () => "greendale-run-2" });
-    expect(later.body.fighters[0].card.attack).toBe(400);
+    expect(later.body.fighters[0].card.attack).toBe(STRONG.attack);
     expect(later.body).toEqual(now.body);
   });
 
@@ -194,7 +194,7 @@ describe("POST /api/run/team", () => {
     const { status, body } = await post({ login: PLAYER, receipt, rounds }, deps);
     expect(status).toBe(200);
     expect(body.team).toMatchObject({ wins: 5, losses: 0 });
-    expect(body.team.fighters[0].card.attack).toBe(400);
+    expect(body.team.fighters[0].card.attack).toBe(STRONG.attack);
   });
 
   it("reads a pool again when its receipt is another account's or wasn't signed with the Worker's key", async () => {
@@ -321,7 +321,7 @@ describe("Beat this team", () => {
     const fight = new Request("https://stars-demo.example/api/run/act", { method: "POST", body: JSON.stringify({ token: started.token, fight: true }) });
     const played = (await (await runResponse("act", fight, deps)).json()) as { run: { losses: number }; fight: { opponent: { login: string }; teams: [unknown, { units: { card: { attack: number } }[] }] } };
     expect(played.fight.opponent.login).toBe(PLAYER);
-    expect(played.fight.teams[1].units.map((unit) => unit.card.attack)).toEqual([400]);
+    expect(played.fight.teams[1].units.map((unit) => unit.card.attack)).toEqual([STRONG.attack]);
     expect(played.run.losses).toBe(1);
     expect(reads.filter((login) => OPPONENTS.includes(login))).toEqual([]);
   });

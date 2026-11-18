@@ -1,7 +1,7 @@
 import { seededRandom } from "../battle.ts";
 import { CONDITION_TICKS, DEPRECATED_EVERY, deprecatedLoss, FLAKY_ODDS, MERGE_CONFLICT_ODDS, RATE_LIMITED, type Aim, type Condition, type Effect, type Gate, type Hook, type Rules, type Trigger } from "./hooks.ts";
 import { GAME_RULES } from "./game-rules.ts";
-import { EVEN } from "./stats.ts";
+import { EVEN, roleOf, type Role } from "./stats.ts";
 import { cellOf, COLS, ROWS, type Card, type Fight, type FightEvent, type Side } from "./types.ts";
 
 // The fight: every card heads for the nearest enemy and hits once in reach, all at the
@@ -45,6 +45,12 @@ type Unit = {
   side: Side;
   index: number;
   card: Card;
+  /** How the card picks its target (targetOf), from its stats (roleOf). */
+  role: Role;
+  /** Whether an assassin has spent its one leap. */
+  leapt: boolean;
+  /** The card an assassin hunts until it falls. */
+  mark?: Unit;
   x: number;
   y: number;
   hp: number;
@@ -267,12 +273,50 @@ function step(arena: Arena, unit: Unit, target: Unit) {
   unit.next = arena.t + STEP_TICKS;
 }
 
+/** The farthest of `units`, then the one with the least HP, then the first placed. */
+function farthest(from: { x: number; y: number }, units: Unit[]): Unit | undefined {
+  return units.reduce<Unit | undefined>((best, unit) => {
+    if (!best) return unit;
+    const further = apart(from, best) - apart(from, unit) || unit.hp - best.hp || unit.index - best.index;
+    return further < 0 ? unit : best;
+  }, undefined);
+}
+
+/**
+ * Who a card goes for. A tank in reach must be hit first (CODEOWNERS: it reviews everything
+ * near it). An assassin ignores that and hunts the farthest card (@mention), the back row,
+ * until it falls.
+ * Everyone else takes the nearest.
+ */
+function targetOf(unit: Unit, enemies: Unit[]): Unit | undefined {
+  if (unit.role === "assassin") {
+    if (!unit.mark || unit.mark.hp <= 0) unit.mark = farthest(unit, enemies);
+    return unit.mark;
+  }
+  const tanks = enemies.filter((enemy) => enemy.role === "tank" && apart(unit, enemy) <= unit.card.range);
+  return nearest(unit, tanks.length > 0 ? tanks : enemies);
+}
+
+/** An assassin's one leap: to the free cell next to its target that is nearest it, if there is one. */
+function leap(arena: Arena, unit: Unit, target: Unit): boolean {
+  const taken = (cell: { x: number; y: number }) => arena.units.some((other) => other.hp > 0 && other.x === cell.x && other.y === cell.y);
+  const cells = DIRECTIONS.map(({ dx, dy }) => ({ x: target.x + dx, y: target.y + dy })).filter((cell) => cell.x >= 0 && cell.x < COLS && cell.y >= 0 && cell.y < ROWS * 2 && !taken(cell));
+  const landing = cells.reduce<{ x: number; y: number } | null>((found, cell) => (!found || apart(unit, cell) < apart(unit, found) ? cell : found), null);
+  unit.leapt = true;
+  if (!landing) return false;
+  unit.x = landing.x;
+  unit.y = landing.y;
+  arena.events.push({ t: arena.t, kind: "move", side: unit.side, unit: unit.index, x: landing.x, y: landing.y });
+  unit.next = arena.t + STEP_TICKS;
+  return true;
+}
+
 function act(arena: Arena, unit: Unit) {
-  const target = nearest(unit, standing(arena, otherSide(unit.side)));
+  const target = targetOf(unit, standing(arena, otherSide(unit.side)));
   if (!target) return;
   if (apart(unit, target) <= unit.card.range) strike(arena, unit, target);
   // A card knocked out this tick still lands its hit, but does not walk.
-  else if (unit.hp > 0) step(arena, unit, target);
+  else if (unit.hp > 0 && !(unit.role === "assassin" && !unit.leapt && leap(arena, unit, target))) step(arena, unit, target);
 }
 
 const over = (arena: Arena) => standing(arena, 0).length === 0 || standing(arena, 1).length === 0;
@@ -288,6 +332,8 @@ export function fightWith(rules: Rules): Fight {
         side,
         index,
         card: placed.card,
+        role: roleOf(placed.card),
+        leapt: false,
         ...cellOf(side, placed),
         hp: placed.card.hp,
         shield: 0,
