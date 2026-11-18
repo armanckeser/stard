@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { fight } from "./fight.ts";
-import { NEW_TALLY, boardLimit, costOf, countRound, newRunSeed, shopFor, snapshot, type RunFighter, type Unit } from "./rules.ts";
+import { NEW_TALLY, boardLimit, costOf, countRound, newRunSeed, levelOf, shopFor, snapshot, type RunFighter, type Unit } from "./rules.ts";
 import { card, cityCollege } from "./testbed.ts";
 
 const unit = (name: string, col: number): Unit => ({ fighter: { fullName: `greendale/${name}`, card: card(`greendale/${name}`, { hp: 600 }) } as RunFighter, col, row: 0 });
@@ -40,10 +40,11 @@ describe("shopFor", () => {
 
 
 describe("newRunSeed", () => {
-  it("gives a new 32-character hex seed each time", () => {
-    const seeds = Array.from({ length: 20 }, () => newRunSeed());
+  it("gives a new seed each time: the level, a dot and 32 hex characters", () => {
+    const seeds = Array.from({ length: 20 }, () => newRunSeed(2));
     expect(new Set(seeds).size).toBe(20);
-    expect(seeds.every((seed) => /^[0-9a-f]{32}$/.test(seed))).toBe(true);
+    expect(seeds.every((seed) => /^2\.[0-9a-f]{32}$/.test(seed) && levelOf(seed) === 2)).toBe(true);
+    expect(levelOf(newRunSeed())).toBe(1);
   });
 });
 

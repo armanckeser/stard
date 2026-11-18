@@ -23,6 +23,7 @@ import { demoUser } from "@/lib/demo";
 import { readNextRound, readRun } from "@/lib/run-reads";
 import { countEvent } from "@/lib/events";
 import { validLogin } from "@/lib/published-list";
+import { playLevel } from "@/lib/level";
 import { LOSSES_TO_END, NEW_TALLY, REROLL_COST, ROUND_GOLD, WINS_TO_FINISH, WIN_GOLD, costOf, newRunSeed, rangeOf, type Player, type RunFighter, type Unit } from "@/lib/run";
 import { NO_RUN, idOf, offerAt, runReducer, sceneOf, type Fought } from "@/lib/run-state";
 import { BOOST_ROUNDS } from "../../server/run/boosts";
@@ -171,7 +172,7 @@ function RunPage() {
   const phone = useMediaQuery("(max-width: 639px), (max-height: 540px)");
 
   const start = (who: string) => {
-    if (validLogin(who)) dispatch({ type: "start", seed: newRunSeed(), login: who.trim() });
+    if (validLogin(who)) dispatch({ type: "start", seed: newRunSeed(playLevel()), login: who.trim() });
   };
 
   // A link with ?me= starts the run on load, so opening the link is all it takes. StrictMode

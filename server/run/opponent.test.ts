@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { OPPONENT_STRENGTH, opponentClass, opponentTeam } from "./opponent.ts";
+import { LEVELS, opponentClass, opponentTeam, strengthFor } from "./opponent.ts";
 import { BOARD_MAX, teamSizeAt, type RunFighter } from "./rules.ts";
 import { roleOf } from "./stats.ts";
 import { card } from "./testbed.ts";
@@ -7,7 +7,7 @@ import type { Card } from "./types.ts";
 
 // Regression guarded: opponents took the first card of each shop and never a boost or a
 // class, so a player who built at all won about 85% of runs. They now draft the way a
-// player does, and OPPONENT_STRENGTH sets how hard each round is (scripts/balance/ramp.ts).
+// player does, and LEVELS set how hard each round is (scripts/balance/ramp.ts).
 
 const fighter = (name: string, over: Partial<Card> = {}): RunFighter => ({ fullName: `greendale/${name}`, defense: over.guard ?? 100, card: card(`greendale/${name}`, over) }) as RunFighter;
 // A legendary ace with 460 points, as BUDGET gives one, then 39 commons and rares from three families.
@@ -36,6 +36,15 @@ describe("an opponent's team", () => {
     expect(at(5).units.length).toBeGreaterThan(teamSizeAt(5));
   });
 
+  // Regression guarded: a run won at level 1 must meet level 2's opponents next, and the
+  // Worker replaying it must agree, so the level travels in the seed both of them read.
+  it("fights at the strength of the level in its seed", () => {
+    expect(strengthFor("2.abc")).toBe(LEVELS[1]);
+    expect(strengthFor("1.abc")).toBe(LEVELS[0]);
+    expect(strengthFor("abc")).toBe(LEVELS[0]);
+    expect(strengthFor("9.abc")).toBe(LEVELS[LEVELS.length - 1]);
+  });
+
   it("is the same team for the same run, so the Play screen and the Worker agree", () => {
     expect(at(4)).toEqual(at(4));
   });
@@ -58,10 +67,10 @@ describe("an opponent's team", () => {
   });
 
   it("shrinks the ace to 385 stat points in round 1, then to the round's share", () => {
-    const share = OPPONENT_STRENGTH[0];
+    const share = LEVELS[0][0];
     const { attack } = aceOf(1);
     expect(attack).toBe(Math.round(115 * (385 / 460) * share));
-    expect(aceOf(5).attack).toBe(Math.round(115 * OPPONENT_STRENGTH[4]));
+    expect(aceOf(5).attack).toBe(Math.round(115 * LEVELS[0][4]));
   });
 
   // Regression guarded: shrinking all of a card's HP turned a bruiser ace into an assassin in

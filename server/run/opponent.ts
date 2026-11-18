@@ -1,6 +1,6 @@
 import { CLASS_IDS, type ClassId } from "../character.ts";
 import { BOOST_ROUNDS, boostOffer } from "./boosts.ts";
-import { BENCH_SIZE, REROLL_COST, ROUND_GOLD, SLOT_COST, START_GOLD, WIN_GOLD, boardLimit, openingScale, costOf, freeCell, scaledBy, shopFor, shuffled, type Pool, type RunFighter, type Unit } from "./rules.ts";
+import { BENCH_SIZE, REROLL_COST, ROUND_GOLD, SLOT_COST, START_GOLD, WIN_GOLD, boardLimit, levelOf, openingScale, costOf, freeCell, scaledBy, shopFor, shuffled, type Pool, type RunFighter, type Unit } from "./rules.ts";
 import { TIERS, teamSets } from "./sets.ts";
 
 // The team a well-known account fields at a round of someone's run, built the way a
@@ -8,15 +8,26 @@ import { TIERS, teamSets } from "./sets.ts";
 // seeded, so the Play screen and the Worker that referees the run build the same team.
 //
 // A player who builds well beats a team built like their own about half the time, which
-// is harder than a first run should be. OPPONENT_STRENGTH scales the cards' stats by round,
+// is harder than a first run should be. LEVELS scale the cards' stats by round,
 // so a run starts easy and gets harder (opponent-strength.test.ts measures the ramp).
 
-/** The share of their stats an opponent's cards fight with, by round; from the last entry on, that one. */
-// Tuned on real play (scripts/balance/replay.ts, 2026-11-18): the 11 saved teams of runs that
-// reached round 5, nearly all won 5-0 at the old strengths, win 90% of round 1s, then 80%,
-// 66%, 68% and 53%, about 56% of runs. draftTeam builds weaker teams than a person does, so
-// ramp.ts shows lower numbers (85% of round 1s down to 24%).
-export const OPPONENT_STRENGTH: readonly number[] = [0.9, 0.88, 0.97, 1.1, 1.25];
+/**
+ * The share of their stats an opponent's cards fight with, by round (from the last entry on,
+ * that one), at each level. A run's level is in its seed (levelOf): a browser plays level 1
+ * until it wins a run, then level 2.
+ */
+// Level 2 is tuned on real play (scripts/balance/replay.ts, 2026-11-18): the 11 saved teams of
+// runs that reached round 5, nearly all won 5-0 at level 1, win 90% of round 1s, then 80%,
+// 66%, 68% and 53%, about 56% of runs. Level 1 is the earlier ramp (ramp.ts on 2026-11-15:
+// a draftTeam player wins 85% down to 52%, 47% of runs). draftTeam builds weaker teams than
+// a person does, so at level 2 ramp.ts shows 85% of round 1s down to 24%.
+export const LEVELS: readonly (readonly number[])[] = [
+  [0.9, 0.85, 0.91, 0.94, 0.96],
+  [0.9, 0.88, 0.97, 1.1, 1.25],
+];
+
+/** The strengths a run seeded `seed` meets. */
+export const strengthFor = (seed: string): readonly number[] => LEVELS[Math.min(levelOf(seed), LEVELS.length) - 1];
 
 /** Rerolls an opponent spends in a round before it stops looking. */
 const REROLLS = 2;
@@ -86,8 +97,8 @@ export function draftTeam(opponent: Pool<RunFighter>, round: number, seed: strin
   return { board: bestBoard(owned, boardLimit(round, bought)), boosts };
 }
 
-/** The opponent's team at `round` of the run seeded `seed`: drafted like a player's, at OPPONENT_STRENGTH. */
-export function opponentTeam(opponent: Pool<RunFighter>, klass: ClassId, round: number, seed: string, strength = OPPONENT_STRENGTH): OpponentTeam {
+/** The opponent's team at `round` of the run seeded `seed`: drafted like a player's, at the run's level. */
+export function opponentTeam(opponent: Pool<RunFighter>, klass: ClassId, round: number, seed: string, strength = strengthFor(seed)): OpponentTeam {
   const { board, boosts } = draftTeam(opponent, round, seed);
   const share = strength[Math.min(round, strength.length) - 1];
   const team = board.map((fighter) => scaledBy(fighter, (round === 1 ? openingScale(fighter) : 1) * share));

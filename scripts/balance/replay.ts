@@ -2,7 +2,7 @@ import { readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import { inflateRawSync } from "node:zlib";
 import { fight } from "../../server/run/fight.ts";
-import { opponentTeam, OPPONENT_STRENGTH } from "../../server/run/opponent.ts";
+import { opponentTeam, LEVELS } from "../../server/run/opponent.ts";
 import { snapshot, winnerOf } from "../../server/run/rules.ts";
 import { savedSnapshotAt, type SavedTeam } from "../../server/run/saved-team.ts";
 import { loadPool } from "./pools.ts";
@@ -15,7 +15,7 @@ import { loadPool } from "./pools.ts";
 
 const SEEDS = Number(process.env.SEEDS ?? 30);
 const [linksFile, folder, override] = process.argv.slice(2);
-const strength = override ? override.split(",").map(Number) : OPPONENT_STRENGTH;
+const strength = override ? override.split(",").map(Number) : LEVELS[LEVELS.length - 1];
 const pools = readdirSync(folder).filter((name) => name.endsWith(".json")).map((name) => loadPool(join(folder, name)));
 const rows = (JSON.parse(readFileSync(linksFile, "utf8")) as { results: { token: string }[] }[])[0].results;
 const teamOf = (token: string) => JSON.parse(inflateRawSync(Buffer.from(token.split(".")[0], "base64url")).toString()) as SavedTeam;

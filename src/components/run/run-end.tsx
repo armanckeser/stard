@@ -6,8 +6,10 @@ import { TeamTiles } from "@/components/run/team-tiles";
 import { Input } from "@/components/ui/input";
 import { beatLine, beatenIn, challengeLink, challengeMessage, type RoundResult } from "@/lib/challenge";
 import { countEvent } from "@/lib/events";
+import { rememberWin } from "@/lib/level";
 import { APP_URL, validLogin } from "@/lib/published-list";
-import { WINS_TO_FINISH, type Player, type Unit } from "@/lib/run";
+import { WINS_TO_FINISH, levelOf, type Player, type Unit } from "@/lib/run";
+import { LEVELS } from "../../../server/run/opponent";
 import { recordOf, saveTeam, teamLink } from "@/lib/saved-team";
 import type { Snapshot } from "../../../server/run/types";
 
@@ -44,6 +46,11 @@ export function RunEnd({ player, seed, rounds, results, team, wins, losses, agai
   against?: string;
   onNewRun: () => void;
 }) {
+  const won = wins >= WINS_TO_FINISH;
+  const level = levelOf(seed);
+  useEffect(() => {
+    if (won) rememberWin();
+  }, [won]);
   const [saving, setSaving] = useState<Saving>({ state: "saving" });
   // A phone that drops its connection for a moment fails the save at once, so a network
   // failure is tried again on its own before the player is asked to.
@@ -75,7 +82,8 @@ export function RunEnd({ player, seed, rounds, results, team, wins, losses, agai
       <header className="text-center">
         <h2 id="run-end-title" className="run-panel-title">{wins >= WINS_TO_FINISH ? "Run finished" : "Run over"}</h2>
         {lead && <p className="run-panel-beat">{lead}</p>}
-        <p className="run-panel-record">{recordOf(wins, losses)}</p>
+        <p className="run-panel-record">{recordOf(wins, losses)}{level > 1 && ` · Level ${level}`}</p>
+        {won && level < LEVELS.length && <p className="run-panel-beat">Level {level + 1} unlocked: from your next run, opponents fight harder.</p>}
       </header>
       <div>
         <p className="run-panel-label">Final team</p>
