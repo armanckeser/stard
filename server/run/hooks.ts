@@ -23,8 +23,9 @@ export type Trigger = "start" | "hit" | "hurt" | "ally-faint" | "third";
  * - `foes`: every enemy standing.
  * - `weakest-ally`: the teammate (the card included) with the smallest share of HP left.
  * - `allies`: every teammate standing, the card included.
+ * - `blast`: the enemy of the moment and every enemy in a cell next to it (Blast radius).
  */
-export type Aim = "self" | "foe" | "weakest-foe" | "foes" | "weakest-ally" | "allies";
+export type Aim = "self" | "foe" | "weakest-foe" | "foes" | "weakest-ally" | "allies" | "blast";
 
 /**
  * A number a `stat` effect changes. `attack`, `guard` and `speed` change by a share
@@ -58,6 +59,13 @@ export const DEPRECATED_SHARE = 1 / 30;
 export const DEPRECATED_EVERY = 10;
 export const FLAKY_ODDS = 1 / 4;
 
+/**
+ * Open issues stack on a card and never wear off: each costs ISSUE_SHARE of its full HP
+ * every DEPRECATED_EVERY ticks, until any heal closes them all.
+ */
+export const ISSUE_SHARE = 1 / 100;
+export const issueLoss = (fullHp: number, issues: number) => Math.max(1, Math.round(fullHp * ISSUE_SHARE * issues));
+
 /** The HP a deprecated card with `fullHp` loses each time the condition bites. */
 export const deprecatedLoss = (fullHp: number) => Math.max(1, Math.round(fullHp * DEPRECATED_SHARE));
 
@@ -70,7 +78,9 @@ export type Effect =
   /** Gives back `share` of the target's full HP, never above full. */
   | { kind: "heal"; aim: Aim; share: number }
   /** Leaves a condition on the target, unless it already has one. */
-  | { kind: "condition"; aim: Aim; condition: Condition };
+  | { kind: "condition"; aim: Aim; condition: Condition }
+  /** Opens one more issue on the target (ISSUE_SHARE). */
+  | { kind: "issue"; aim: Aim };
 
 /**
  * - `alone`: no teammate is standing.

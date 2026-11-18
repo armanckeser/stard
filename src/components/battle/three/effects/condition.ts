@@ -1,6 +1,6 @@
 import * as THREE from "three";
 import { easeOut, sphere } from "../kit";
-import { CAST_LEAD, CONDITION_COLOR, type EffectActor, type EffectPlayer, type EffectStage } from "./stage";
+import { CAST_LEAD, CONDITION_COLOR, ISSUE_COLOR, type EffectActor, type EffectPlayer, type EffectStage } from "./stage";
 
 // An orb in the condition's own colour flies from the caster to the target and pops there.
 // The fight's own `condition` event shows the badge in the same tick, so the flight is
@@ -33,17 +33,21 @@ const REDUCED_LIFE = 0.45;
 /** The look is freed this long after its last frame, so the last fade is drawn. */
 const SPARE = 0.05;
 
-export const playCondition: EffectPlayer<"condition"> = (stage, cast) => {
-  const color = CONDITION_COLOR[cast.effect.condition];
+export const playCondition: EffectPlayer<"condition"> = (stage, cast) => throwOrbs(stage, cast.caster, cast.targets, CONDITION_COLOR[cast.effect.condition]);
+
+/** An issue opened flies as a GitHub-green orb: the board's ◉ count says how many are open. */
+export const playIssue: EffectPlayer<"issue"> = (stage, cast) => throwOrbs(stage, cast.caster, cast.targets, ISSUE_COLOR);
+
+function throwOrbs(stage: EffectStage, caster: EffectActor, targets: EffectActor[], color: string) {
   const geometry = sphere(CORE_RADIUS, ORB_DETAIL);
   const root = new THREE.Group();
   stage.spawn(root, stage.reduced ? REDUCED_LIFE : CAST_LEAD + TRAVEL + POP_LIFE + SPARE);
-  const look = { root, geometry, color, trail: cast.targets.length <= TRAIL_LIMIT };
-  for (const target of cast.targets) {
+  const look = { root, geometry, color, trail: targets.length <= TRAIL_LIMIT };
+  for (const target of targets) {
     if (stage.reduced) glowInPlace(stage, target, look);
-    else fly(stage, cast.caster, target, look);
+    else fly(stage, caster, target, look);
   }
-};
+}
 
 type Look = { root: THREE.Group; geometry: THREE.BufferGeometry; color: string; trail: boolean };
 

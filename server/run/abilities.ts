@@ -33,6 +33,7 @@ export const ABILITIES: Ability[] = [
 
   // After each of the card's hits.
   { id: "review-swarm", name: "Review swarm", text: "On attack: hit again for 20%.", on: "hit", effects: [{ kind: "damage", aim: "foe", power: 0.2 }], fits: (repo) => repo.contributors >= 50 },
+  { id: "open-issues", name: "Open issues", text: "On attack: open an issue on the target. Each open issue costs 1% HP a second, until a heal closes them all.", on: "hit", effects: [{ kind: "issue", aim: "foe" }], fits: (repo) => repo.openIssues >= 50 && repo.closeRate < 0.5 },
   { id: "cherry-pick", name: "Cherry pick", text: "On attack: nick the weakest enemy.", on: "hit", effects: [{ kind: "damage", aim: "weakest-foe", power: 0.3 }], fits: (repo) => repo.stars > 20 && repo.forks / repo.stars >= 0.3 },
 
   // After the card is hit and still standing.
@@ -52,6 +53,7 @@ export const ABILITIES: Ability[] = [
   { id: "force-push", name: "Force push", text: "Every 3rd attack: hit again for 120%.", on: "third", effects: [{ kind: "damage", aim: "foe", power: 1.2 }], fits: (repo) => repo.yearly >= 1000 },
   { id: "rebase", name: "Rebase", text: "Every 3rd attack: heal 10%.", on: "third", effects: [{ kind: "heal", aim: "self", share: 0.1 }], fits: (repo) => repo.age < 1 },
   { id: "green-build", name: "Green build", text: "Every 3rd attack: heal the weakest ally 5%.", on: "third", effects: [{ kind: "heal", aim: "weakest-ally", share: 0.05 }], fits: (repo) => repo.releases >= 10 },
+  { id: "blast-radius", name: "Blast radius", text: "Every 3rd attack: hit the target and every enemy next to it for 50%.", on: "third", effects: [{ kind: "damage", aim: "blast", power: 0.5 }], fits: (repo) => /core|kernel|engine|runtime|framework|platform/.test(repo.name) },
   { id: "star-storm", name: "Star storm", text: "Every 3rd attack: hit all enemies for 25%.", on: "third", effects: [{ kind: "damage", aim: "foes", power: 0.25 }], fits: (repo) => repo.stars >= 10_000 },
   { id: "breaking-change", name: "Breaking change", text: "Every 3rd attack: cause a merge conflict.", on: "third", effects: [{ kind: "condition", aim: "foe", condition: "merge-conflict" }], fits: (repo) => repo.releases >= 30 },
   { id: "stale-bot", name: "Stale bot", text: "Every 3rd attack: make the target flaky.", on: "third", effects: [{ kind: "condition", aim: "foe", condition: "flaky" }], fits: (repo) => repo.openIssues >= 200 },

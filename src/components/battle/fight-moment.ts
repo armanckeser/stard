@@ -18,7 +18,7 @@ type Tracked = Omit<CreatureMoment, "condition"> & { condition: { name: Conditio
 const otherSide = (side: Side): Side => (side === 0 ? 1 : 0);
 
 function apply(sides: [Tracked[], Tracked[]], fullHp: [number[], number[]], event: FightEvent) {
-  if (event.kind === "end" || event.kind === "move" || event.kind === "ability") return;
+  if (event.kind === "end" || event.kind === "move" || event.kind === "ability" || event.kind === "issues") return;
   if (event.kind === "hit") {
     const target = sides[otherSide(event.side)][event.target];
     if (target) target.hp = Math.max(0, target.hp - event.damage);

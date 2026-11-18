@@ -55,6 +55,8 @@ export type FightEvent =
   | { t: number; kind: "hp"; side: Side; unit: number; change: number; cause: string }
   /** The shield a card has left, after it gains one or a hit takes some of it. 0 is no shield. */
   | { t: number; kind: "shield"; side: Side; unit: number; shield: number }
+  /** The issues open on a card, after one opens or a heal closes them (0). */
+  | { t: number; kind: "issues"; side: Side; unit: number; issues: number }
   | { t: number; kind: "faint"; side: Side; unit: number }
   | { t: number; kind: "end"; winner: Side | null };
 

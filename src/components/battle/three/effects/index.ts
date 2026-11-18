@@ -1,7 +1,7 @@
 import type { Aim, Effect } from "../../../../../server/run/hooks";
 import { effectsOf } from "../../../../../server/run/names";
 import { playCastRing } from "./cast";
-import { playCondition } from "./condition";
+import { playCondition, playIssue } from "./condition";
 import { playDamage } from "./damage";
 import { playHeal } from "./heal";
 import { playShield } from "./shield";
@@ -17,9 +17,10 @@ const PLAYERS: { [Kind in Effect["kind"]]: EffectPlayer<Kind> } = {
   heal: playHeal,
   stat: playStat,
   condition: playCondition,
+  issue: playIssue,
 };
 
-const ON_FOES: Record<Aim, boolean> = { self: false, foe: true, "weakest-foe": true, foes: true, "weakest-ally": false, allies: false };
+const ON_FOES: Record<Aim, boolean> = { self: false, foe: true, "weakest-foe": true, foes: true, "weakest-ally": false, allies: false, blast: true };
 
 /**
  * Plays what the ability, set bonus or boost `source` just did. The fight's `ability`

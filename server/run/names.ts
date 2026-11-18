@@ -105,11 +105,12 @@ const STAT_WORDS: Record<Stat, string> = { attack: "attack", guard: "guard", spe
 function effectWords(effect: Effect): string {
   const many = effect.aim === "foes" || effect.aim === "allies";
   const weakest = effect.aim === "weakest-foe" || effect.aim === "weakest-ally";
-  const reach = many ? " all" : weakest ? " weakest" : "";
+  const reach = many ? " all" : weakest ? " weakest" : effect.aim === "blast" ? " around" : "";
   if (effect.kind === "damage") return effect.aim === "foe" ? "extra hit" : `hit${reach}`;
   if (effect.kind === "shield") return `shield${reach}`;
   if (effect.kind === "heal") return `heal${reach}`;
   if (effect.kind === "condition") return CONDITION_NAMES[effect.condition];
+  if (effect.kind === "issue") return "open issue";
   const whose = effect.aim === "self" ? "" : effect.aim.endsWith("foe") || effect.aim === "foes" ? "foe " : "team ";
   return `${whose}${STAT_WORDS[effect.stat]} ${effect.by < 0 ? "down" : "up"}`;
 }

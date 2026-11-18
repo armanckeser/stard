@@ -1,5 +1,5 @@
 import { seededRandom } from "../battle.ts";
-import { CONDITION_TICKS, DEPRECATED_EVERY, deprecatedLoss, FLAKY_ODDS, MERGE_CONFLICT_ODDS, RATE_LIMITED, type Aim, type Condition, type Effect, type Gate, type Hook, type Rules, type Trigger } from "./hooks.ts";
+import { CONDITION_TICKS, DEPRECATED_EVERY, deprecatedLoss, FLAKY_ODDS, issueLoss, MERGE_CONFLICT_ODDS, RATE_LIMITED, type Aim, type Condition, type Effect, type Gate, type Hook, type Rules, type Trigger } from "./hooks.ts";
 import { GAME_RULES } from "./game-rules.ts";
 import { EVEN, roleOf, type Role } from "./stats.ts";
 import { cellOf, COLS, ROWS, type Card, type Fight, type FightEvent, type Side } from "./types.ts";
@@ -72,6 +72,9 @@ type Unit = {
   spent: Set<Hook>;
   /** The card's condition, who left it, when it wears off and when it next bites. */
   condition: { name: Condition; from: Unit; until: number; bite: number } | null;
+  /** Issues open on the card, and when they next bite. */
+  issues: number;
+  issuesBite: number;
 };
 
 type Arena = { units: Unit[]; events: FightEvent[]; random: () => number; t: number };
@@ -149,6 +152,10 @@ function reach(arena: Arena, unit: Unit, aim: Aim, foe: Unit | undefined): Unit[
       return least(allies, (ally) => ally.hp / ally.card.hp);
     case "allies":
       return allies;
+    case "blast": {
+      const [hit] = reach(arena, unit, "foe", foe);
+      return hit ? [hit, ...enemies.filter((enemy) => enemy !== hit && apart(enemy, hit) <= 1)] : [];
+    }
   }
 }
 
@@ -185,6 +192,16 @@ function affect(arena: Arena, unit: Unit, effect: Effect, target: Unit, source: 
       return;
     case "heal":
       changeHp(arena, target, Math.min(target.card.hp - target.hp, Math.round(target.card.hp * effect.share)), source);
+      if (target.issues > 0 && target.hp > 0) {
+        target.issues = 0;
+        arena.events.push({ t: arena.t, kind: "issues", side: target.side, unit: target.index, issues: 0 });
+      }
+      return;
+    case "issue":
+      if (target.hp <= 0) return;
+      if (target.issues === 0) target.issuesBite = arena.t + DEPRECATED_EVERY;
+      target.issues++;
+      arena.events.push({ t: arena.t, kind: "issues", side: target.side, unit: target.index, issues: target.issues });
       return;
     case "condition":
       if (target.hp <= 0 || target.condition) return;
@@ -205,6 +222,10 @@ function changeHp(arena: Arena, unit: Unit, change: number, cause: string) {
 /** Wears conditions off, and lets a deprecated card lose its HP. A deprecated card's loss is a hit by the card that left it. */
 function wearConditions(arena: Arena) {
   for (const unit of arena.units) {
+    if (unit.issues > 0 && unit.hp > 0 && arena.t >= unit.issuesBite) {
+      unit.issuesBite = arena.t + DEPRECATED_EVERY;
+      changeHp(arena, unit, -issueLoss(unit.card.hp, unit.issues), "open-issues");
+    }
     const condition = unit.condition;
     if (!condition || unit.hp <= 0) continue;
     if (condition.name === "deprecated" && arena.t >= condition.bite) {
@@ -346,6 +367,8 @@ export function fightWith(rules: Rules): Fight {
         hooks: hooks[index] ?? [],
         spent: new Set(),
         condition: null,
+        issues: 0,
+        issuesBite: 0,
       }));
     });
     const arena: Arena = { units, events: [], random, t: 0 };
