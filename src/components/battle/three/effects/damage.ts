@@ -51,6 +51,12 @@ const BURST_CUT = 0.7;
 /** A burst per target costs a mesh each; past this many targets they land without one. */
 const MOST_BURSTS = 5;
 
+/** The blast ring: from under the target out past the next cells (a cell is about 1.3 units). */
+const BLAST_COLOR = 0xff8f3d;
+const BLAST_LIFE = 0.4;
+const BLAST_FROM = 0.2;
+const BLAST_TO = 1.7;
+
 const STILL_GLOW_LIFE = 0.3;
 const STILL_GLOW_RADIUS = 0.3;
 const STILL_GLOW_OPACITY = 0.45;
@@ -60,6 +66,7 @@ export const playDamage: EffectPlayer<"damage"> = (stage, cast) => {
   if (targets.length === 0) return;
   const weight = Math.min(1, Math.max(0, cast.effect.power / HEAVY_POWER));
   if (stage.reduced) return glowStill(stage, targets);
+  if (cast.effect.aim === "blast") blastRing(stage, targets[0]);
   const look = shardLook(weight, targets.length);
   targets.forEach((target, index) => throwShard(stage, look, cast.caster, target, fanOffset(index, targets.length)));
 };
@@ -152,6 +159,20 @@ function burstAt(stage: EffectStage, geometry: THREE.BufferGeometry, size: numbe
     burst.rotateZ(spin);
     burst.scale.setScalar(size * Math.max(0.01, overshoot(Math.min(1, k * BURST_OPEN_SPEED))));
     material.opacity = (1 - k) ** 2;
+  });
+}
+
+/** Blast radius: an orange ring opens on the floor from the target out over the cells next to it, as the shards land. */
+function blastRing(stage: EffectStage, target: EffectActor) {
+  const material = new THREE.MeshBasicMaterial({ color: BLAST_COLOR, transparent: true, depthWrite: false, side: THREE.DoubleSide });
+  const ring = new THREE.Mesh(new THREE.RingGeometry(0.85, 1, 48), material);
+  ring.rotation.x = -Math.PI / 2;
+  ring.renderOrder = 4;
+  stage.spawn(ring, CAST_LEAD + BLAST_LIFE);
+  stage.tween(CAST_LEAD, BLAST_LIFE, (k) => {
+    ring.position.copy(target.at).setY(0.13);
+    ring.scale.setScalar(BLAST_FROM + (BLAST_TO - BLAST_FROM) * easeOut(k));
+    material.opacity = 0.9 * (1 - k);
   });
 }
 

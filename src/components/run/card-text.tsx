@@ -1,5 +1,5 @@
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { CONDITION_WORDS, conditionOfWord, conditionTip, withFirst } from "../../../server/run/names";
+import { CONDITION_WORDS, tipOfWord, withFirst } from "../../../server/run/names";
 
 const DOTTED = "underline decoration-dotted underline-offset-2";
 
@@ -16,7 +16,7 @@ export function CardText({ text, first, plain = false }: { text: string; first?:
   const match = CONDITION_WORDS.exec(shown);
   if (!match) return <>{shown}</>;
   const word = match[0];
-  const tip = conditionTip(conditionOfWord(word));
+  const tip = tipOfWord(word);
   return (
     <>
       {shown.slice(0, match.index)}

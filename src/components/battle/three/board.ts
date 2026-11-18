@@ -781,6 +781,10 @@ export class BoardWorld {
       if (quick) return;
       if (event.change > 0) actor.flash = 0.5;
       this.label(this.over(actor, 0.25), event.change > 0 ? `+${event.change}` : `−${-event.change}`, event.change > 0 ? ADDED : { color: CONDITION_COLOR[event.cause as Condition] ?? "#ff8f93" });
+    } else if (event.kind === "issues") {
+      // Open issues read as GitHub's: a green ◉ and how many; a heal closes them all, ✓.
+      if (quick) return;
+      this.label(this.over(actor, 0.45), event.issues > 0 ? `◉ ${event.issues}` : "✓ closed", { color: "#d2fedb", chip: event.issues > 0 ? "#1a7f37" : "#116329", size: 14 });
     } else if (event.kind === "condition") {
       const condition = event.condition as Condition;
       actor.badge.visible = event.on && condition in CONDITION_NAMES;

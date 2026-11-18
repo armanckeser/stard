@@ -58,6 +58,7 @@ export function missingEffect(events: FightEvent[], control: FightEvent[], sourc
       if (effect.kind === "damage") return after.some((next) => next.kind === "hit" && next.side === event.side && next.unit === event.unit && !next.critical);
       if (effect.kind === "heal") return events.some((next) => next.kind === "hp" && next.cause === source && next.change > 0);
       if (effect.kind === "condition") return after.some((next) => next.kind === "condition" && next.condition === effect.condition && next.on);
+      if (effect.kind === "issue") return after.some((next) => next.kind === "issues" && next.issues > 0);
       return true;
     });
     if (!shown) return `${source}: no sign of its ${effect.kind}`;
