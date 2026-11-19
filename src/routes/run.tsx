@@ -307,8 +307,8 @@ function RunPage() {
 
       {player && round && (
         <div className="checks-rail pointer-events-none absolute inset-x-0 top-14 z-10 flex items-start justify-between gap-2 px-1 sm:top-20 sm:px-2">
-          <Checks title="Checks" cards={units.map((unit) => unit.fighter.card)} boosts={boosts} folds={phone} />
-          <Checks title={round.opponent.login} cards={round.theirs.map((unit) => unit.fighter.card)} boosts={round.theirBoosts} align="right" folds />
+          <Checks title="Checks" cards={units.map((unit) => unit.fighter.card)} boosts={boosts} folds={phone} pulse={phase.kind !== "shop"} />
+          <Checks title={round.opponent.login} cards={round.theirs.map((unit) => unit.fighter.card)} boosts={round.theirBoosts} align="right" folds pulse={phase.kind !== "shop"} />
         </div>
       )}
 

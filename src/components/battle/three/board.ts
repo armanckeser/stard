@@ -3,14 +3,16 @@ import { RoundedBoxGeometry } from "three/examples/jsm/geometries/RoundedBoxGeom
 import { seededRandom, type Fighter } from "../../../../server/battle";
 import type { Wearer } from "../../../../server/character";
 import type { Condition } from "../../../../server/run/hooks";
-import { CONDITION_NAMES, sourceOf } from "../../../../server/run/names";
+import { abilityHooks } from "../../../../server/run/abilities";
+import { CONDITION_NAMES, hookOf } from "../../../../server/run/names";
 import { BENCH_SIZE } from "../../../../server/run/rules";
 import { roleOf } from "../../../../server/run/stats";
 import { COLS, ROWS, TICK_MS, type Card, type FightEvent, type Side } from "../../../../server/run/types";
 import { ARCHIVE_DEPTH, ARCHIVE_WIDTH, buildArchive, type Archive } from "./archive";
 import { buildCreature, type Creature } from "./creature";
 import { playFired, SHIELD_KEY, type EffectActor, type EffectStage } from "./effects";
-import { CONDITION_COLOR, EFFECT_COLOR } from "./effects/stage";
+import { CONDITION_COLOR, EFFECT_COLOR, ISSUE_COLOR } from "./effects/stage";
+import { CONDITION_ICON, iconTexture } from "./octicons";
 import { dispose, easeOut, overshoot, part, sphere, toon } from "./kit";
 import { buildTrainer, type Trainer } from "./trainer";
 
@@ -49,11 +51,14 @@ type Actor = {
   attachments: Map<string, THREE.Object3D>;
   /** The creature as an effect sees it. */
   view: EffectActor;
-  /** The condition the creature has, shown over its HP bar. */
+  /** The condition the creature has: GitHub's icon for it, at the right end of the HP bar. */
   badge: THREE.Mesh;
-  /** When each ability, set or boost was last named over the creature, and when the next name may show. */
-  named: Map<string, number>;
-  nextName: number;
+  /** Open issues on the creature: the issue icon and how many, at the left end of the HP bar. */
+  issueBadge: THREE.Mesh;
+  /** Three squares under the HP bar, one filled per attack, for a card whose ability fires every third attack; null for any other card. */
+  charge: THREE.Mesh[] | null;
+  /** Attacks made since the ability last fired. */
+  charged: number;
   grow: number;
   lunge: THREE.Vector3;
   /** A shove from the last hit, away from the hitter, that dies out on its own. */
@@ -81,15 +86,10 @@ const FLOOR_SATURATION = 0.4;
 const FLOOR_CAP = new THREE.Color(MINE[1]).getHSL({ h: 0, s: 0, l: 0 }).l * 0.35;
 
 /** How long an ability's name stays over the creature, in milliseconds. */
-const POP_LIFE = 900;
 const BAR_WIDTH = 0.84;
 /** Seconds from a ranged card's ability hit to its number: when a melee lunge lands, which effects/damage.ts times its shard to. */
 const ABILITY_HIT_LANDS = 0.11;
-/** Diff chips, as GitHub draws a removed and an added line, for the rare moments: a shield raised (✓) or broken (✗). */
-const REMOVED = { color: "#ffd7d5", chip: "#8e1519" };
-const ADDED = { color: "#d2fedb", chip: "#116329" };
-/** Hits, heals and crits are plain numbers so a busy fight stays readable; a crit stands out by being bigger, yellow and popping in. */
-const DAMAGE = { color: "#ffd7d5" };
+/** Only heals and crits get a number, plain with a dark outline; a crit is bigger, yellow, and pops in. */
 const HEAL = { color: "#7ee2a8" };
 const CRITICAL = { color: "#ffd84d" };
 /** A tank lifts this high before it slams down; an assassin dashes this far past the usual reach. */
@@ -118,8 +118,6 @@ const FAINT_TILT_TIME = 0.12;
 /** A strong ease-out: fast away, a long settle. */
 const EASE_OUT = "cubic-bezier(0.23, 1, 0.32, 1)";
 /** Names over one creature show at least this far apart, and the same name at most this often, in fight seconds. */
-const NAME_GAP = 0.32;
-const NAME_REPEAT = 2.4;
 
 /** A run card's role (a plain battle's fighters have no card, and strike as before). */
 const roleOfUnit = (unit: BoardUnit) => {
@@ -207,7 +205,7 @@ export class BoardWorld {
   private raycaster = new THREE.Raycaster();
   private ground = new THREE.Plane(new THREE.Vector3(0, 1, 0), -0.1);
   private labels = new Set<HTMLElement>();
-  private badges = new Map<Condition, THREE.CanvasTexture>();
+  private badges = new Map<string, THREE.CanvasTexture>();
   private disposed = false;
   /** What an effect may touch on this board (effects/stage.ts). */
   private stage: EffectStage;
@@ -369,8 +367,8 @@ export class BoardWorld {
         this.clearAttachments(actor);
         actor.bar.visible = unit.bench === undefined;
         actor.badge.visible = false;
-        actor.named.clear();
-        actor.nextName = 0;
+        actor.issueBadge.visible = false;
+        this.charge(actor, 0);
         this.fill(actor);
         if (actor.grow < 1) this.tween(0, 0.35, (k) => (actor.grow = overshoot(k)));
       }
@@ -399,6 +397,7 @@ export class BoardWorld {
   play(fight: BoardFight) {
     if (this.fight?.key === fight.key) return;
     this.fight = { ...fight, next: 0, time: -0.6, done: false };
+    for (const actor of this.actors.values()) this.charge(actor, 0);
     this.selected = null;
     this.drag = null;
   }
@@ -604,18 +603,32 @@ export class BoardWorld {
     trailFill.renderOrder = 11;
     fill.renderOrder = 11;
     shieldFill.renderOrder = 11;
-    const badge = new THREE.Mesh(new THREE.PlaneGeometry(0.84, 0.21), new THREE.MeshBasicMaterial({ depthTest: false, transparent: true }));
-    badge.position.set(0, 0.19, 0.004);
+    const badge = new THREE.Mesh(new THREE.PlaneGeometry(0.26, 0.26), new THREE.MeshBasicMaterial({ depthTest: false, transparent: true }));
+    badge.position.set(BAR_WIDTH / 2 + 0.17, 0, 0.004);
     badge.renderOrder = 12;
     badge.visible = false;
     // The badge picks its creature as the body does (actorUnder).
     badge.userData.actor = unit.id;
-    bar.add(back, trailFill, fill, shieldFill, badge);
+    const issueBadge = new THREE.Mesh(new THREE.PlaneGeometry(0.48, 0.24), new THREE.MeshBasicMaterial({ depthTest: false, transparent: true }));
+    issueBadge.position.set(-BAR_WIDTH / 2 - 0.28, 0, 0.004);
+    issueBadge.renderOrder = 12;
+    issueBadge.visible = false;
+    bar.add(back, trailFill, fill, shieldFill, badge, issueBadge);
+    const charge = abilityHooks((unit.fighter as { card?: Card }).card?.ability ?? "").some((hook) => hook.on === "third")
+      ? [-1, 0, 1].map((i) => {
+          const square = new THREE.Mesh(new THREE.PlaneGeometry(0.1, 0.05), new THREE.MeshBasicMaterial({ color: EFFECT_COLOR.fired, depthTest: false, transparent: true }));
+          square.position.set(i * 0.13, -0.1, 0.004);
+          square.renderOrder = 12;
+          bar.add(square);
+          return square;
+        })
+      : null;
     // Turn first, then tip: a faint tips the creature back the way it faces.
     creature.root.rotation.order = "YXZ";
     this.scene.add(creature.root, bar);
     const home = homeOf(unit);
-    const actor = { unit, creature, home, at: home.clone(), facing: 0, hp: unit.fighter.hp, shield: 0, bar, fill, shieldFill, trailFill, trail: 1, trailHold: 0, attachments: new Map(), badge, named: new Map(), nextName: 0, grow: 0, lunge: new THREE.Vector3(), knock: new THREE.Vector3(), flash: 0, squash: 0, squashSpeed: 0, tilt: 0, out: false, won: false } as Omit<Actor, "view"> as Actor;
+    const actor = { unit, creature, home, at: home.clone(), facing: 0, hp: unit.fighter.hp, shield: 0, bar, fill, shieldFill, trailFill, trail: 1, trailHold: 0, attachments: new Map(), badge, issueBadge, charge, charged: 0, grow: 0, lunge: new THREE.Vector3(), knock: new THREE.Vector3(), flash: 0, squash: 0, squashSpeed: 0, tilt: 0, out: false, won: false } as Omit<Actor, "view"> as Actor;
+    this.charge(actor, 0);
     actor.view = {
       side: unit.side,
       get at() {
@@ -760,8 +773,15 @@ export class BoardWorld {
       }
     } else if (event.kind === "ability") {
       this.cast = { side: event.side, unit: event.unit, t: event.t };
+      if (actor.charge && hookOf(event.ability)?.on === "third") this.after(quick ? 0 : 0.3, () => this.charge(actor, 0));
       if (quick) return;
-      this.name(actor, event.ability);
+      // At fight start every set bonus and boost fires on every card it lifts. A buff there is a short glow and no more,
+      // so the board doesn't jump; the set panel already says which sets are live.
+      const hook = hookOf(event.ability);
+      if (hook?.on === "start" && hook.effects.every((effect) => effect.kind === "stat" || effect.kind === "shield")) {
+        actor.flash = Math.max(actor.flash, 0.6);
+        return;
+      }
       const ids = fight.ids;
       const reached = (onFoes: boolean) => {
         const side = onFoes === (event.side === 0) ? 1 : 0;
@@ -770,36 +790,42 @@ export class BoardWorld {
       playFired(this.stage, event.ability, actor.view, reached);
     } else if (event.kind === "shield") {
       // A shield reads as a required check: ✓ when one goes up, a red ✗ when it is broken.
-      const status = actor.shield === 0 && event.shield > 0 ? "✓" : actor.shield > 0 && event.shield === 0 ? "✗" : null;
       actor.shield = event.shield;
       this.fill(actor);
-      if (status && !quick && this.now - (actor.named.get(status) ?? -Infinity) > NAME_GAP) {
-        actor.named.set(status, this.now);
-        this.label(this.over(actor, 0.45), status, status === "✓" ? { ...ADDED, size: 17 } : { ...REMOVED, size: 17 });
-      }
       if (event.shield === 0) this.stage.detach(actor.view, SHIELD_KEY);
     } else if (event.kind === "hp") {
       actor.hp = Math.max(0, Math.min(actor.unit.fighter.hp, actor.hp + event.change));
       this.fill(actor, event.change < 0);
       if (quick) return;
-      if (event.change > 0) actor.flash = 0.5;
-      this.label(this.over(actor, 0.25), event.change > 0 ? `+${event.change}` : `−${-event.change}`, event.change > 0 ? HEAL : { color: CONDITION_COLOR[event.cause as Condition] ?? "#ff8f93" });
+      // Only a heal gets a number: a bleed or an open issue shows as the HP bar draining.
+      if (event.change > 0) {
+        actor.flash = 0.5;
+        this.label(this.over(actor, 0.25), `+${event.change}`, HEAL);
+      }
     } else if (event.kind === "issues") {
-      // Open issues read as GitHub's: a green ◉ and how many; a heal closes them all, ✓.
-      if (quick) return;
-      this.label(this.over(actor, 0.45), event.issues > 0 ? `◉ ${event.issues}` : "✓ closed", { color: "#d2fedb", chip: event.issues > 0 ? "#1a7f37" : "#116329", size: 14 });
+      // Open issues read as GitHub's: the green issue icon and how many, beside the HP bar; a heal closes them all.
+      actor.issueBadge.visible = event.issues > 0;
+      if (event.issues > 0) {
+        const material = actor.issueBadge.material as THREE.MeshBasicMaterial;
+        material.map = this.badgeFor(`issues:${event.issues}`, () => iconTexture("issue-opened", ISSUE_COLOR, event.issues));
+        material.needsUpdate = true;
+      }
     } else if (event.kind === "condition") {
       const condition = event.condition as Condition;
       actor.badge.visible = event.on && condition in CONDITION_NAMES;
       if (actor.badge.visible) {
         const material = actor.badge.material as THREE.MeshBasicMaterial;
-        material.map = this.badgeFor(condition);
+        material.map = this.badgeFor(condition, () => iconTexture(CONDITION_ICON[condition], CONDITION_COLOR[condition]));
         material.needsUpdate = true;
       }
     } else if (event.kind === "hit") {
       const target = this.actors.get(fight.ids[event.side === 0 ? 1 : 0][event.target]);
       if (!target) return;
       target.hp = Math.max(0, target.hp - event.damage);
+      const cast = this.cast;
+      const fromAbility = cast !== null && cast.side === event.side && cast.unit === event.unit && cast.t === event.t;
+      // An attack, not an ability's hit, fills a charge square; the third fires the ability and empties them.
+      if (!fromAbility && actor.charge) this.charge(actor, (actor.charged % 3) + 1);
       if (quick) return this.fill(target, true);
       const reduced = this.options.reduced;
       const toward = target.home.clone().sub(actor.home);
@@ -818,10 +844,9 @@ export class BoardWorld {
           if (event.critical) this.shake = 0.12;
           if (fainted) this.stopped = HIT_STOP;
         }
-        this.label(this.over(target, 0.25), `−${event.damage}`, event.critical ? { ...CRITICAL, size: 21, pop: 1.5 } : DAMAGE);
+        // Only a crit gets a number; a hit shows as the flash, the knock-back and the HP bar.
+        if (event.critical) this.label(this.over(target, 0.25), `−${event.damage}`, { ...CRITICAL, size: 21, pop: 1.5 });
       };
-      const cast = this.cast;
-      const fromAbility = cast !== null && cast.side === event.side && cast.unit === event.unit && cast.t === event.t;
       if (reduced) {
         land();
       } else if (fromAbility && actor.unit.ranged) {
@@ -915,12 +940,12 @@ export class BoardWorld {
   }
 
   /** A number that pops on, rises over the board and fades. With reduced motion it only fades, in place. */
-  private label(at: THREE.Vector3, text: string, style: { color?: string; chip?: string; size?: number; pop?: number }) {
+  private label(at: THREE.Vector3, text: string, style: { color?: string; size?: number; pop?: number }) {
     const point = at.project(this.camera);
     const label = document.createElement("span");
     label.textContent = text;
     const life = 650;
-    label.style.cssText = `position:absolute;left:${(point.x * 0.5 + 0.5) * 100}%;top:${(-point.y * 0.5 + 0.5) * 100}%;transform:translate(-50%,-100%);pointer-events:none;z-index:5;font:700 ${style.size ?? 15}px/1.2 var(--font-display, system-ui);color:${style.color ?? "#fff"};${style.chip ? `background:${style.chip};padding:0 6px;border-radius:6px;font-family:var(--font-mono, ui-monospace, monospace);box-shadow:0 1px 3px #0008` : "text-shadow:0 1px 0 #000,0 0 6px #000"}`;
+    label.style.cssText = `position:absolute;left:${(point.x * 0.5 + 0.5) * 100}%;top:${(-point.y * 0.5 + 0.5) * 100}%;transform:translate(-50%,-100%);pointer-events:none;z-index:5;font:700 ${style.size ?? 15}px/1.2 var(--font-display, system-ui);color:${style.color ?? "#fff"};text-shadow:0 1px 0 #000,0 0 6px #000`;
     this.host.append(label);
     this.labels.add(label);
     const pop = style.pop ?? 1.25;
@@ -939,57 +964,16 @@ export class BoardWorld {
     }, life);
   }
 
-  /** The name of what fired, a small gold word over the creature for under a second (docs/GAME-UI.md §9). It sits above the HP bar, never on it. */
-  private pop(at: THREE.Vector3, id: string) {
-    const name = sourceOf(id).name;
-    const point = at.project(this.camera);
-    const word = document.createElement("span");
-    word.className = "ability-pop";
-    word.dataset.named = name;
-    word.textContent = name;
-    word.style.cssText = `left:${(point.x * 0.5 + 0.5) * 100}%;top:${(-point.y * 0.5 + 0.5) * 100}%;--life:${POP_LIFE}ms`;
-    this.host.append(word);
-    this.labels.add(word);
-    setTimeout(() => {
-      word.remove();
-      this.labels.delete(word);
-    }, POP_LIFE);
+  /** Fills `count` of the creature's three charge squares; the rest show dim. */
+  private charge(actor: Actor, count: number) {
+    actor.charged = count;
+    actor.charge?.forEach((square, i) => ((square.material as THREE.MeshBasicMaterial).opacity = i < count ? 1 : 0.25));
   }
 
-  /** Names the ability, set bonus or boost that just fired, over the creature. Names queue a little apart, and the same one does not repeat on every hit. */
-  private name(actor: Actor, id: string) {
-    const last = actor.named.get(id);
-    if (last !== undefined && this.now - last < NAME_REPEAT) return;
-    actor.named.set(id, this.now);
-    const at = Math.max(this.now, actor.nextName);
-    actor.nextName = at + NAME_GAP;
-    const fight = this.fight;
-    this.after(at - this.now, () => {
-      if (this.disposed || this.fight !== fight || actor.out) return;
-      actor.squash = Math.max(actor.squash, 0.1);
-      this.pop(this.over(actor, 0.18), id);
-    });
-  }
-
-  private badgeFor(condition: Condition): THREE.CanvasTexture {
-    const made = this.badges.get(condition);
-    if (made) return made;
-    const canvas = document.createElement("canvas");
-    canvas.width = 256;
-    canvas.height = 64;
-    const pen = canvas.getContext("2d")!;
-    pen.fillStyle = CONDITION_COLOR[condition];
-    pen.beginPath();
-    pen.roundRect(4, 6, 248, 52, 26);
-    pen.fill();
-    pen.fillStyle = "#0b0f14";
-    pen.font = "700 30px system-ui, sans-serif";
-    pen.textAlign = "center";
-    pen.textBaseline = "middle";
-    pen.fillText(CONDITION_NAMES[condition], 128, 33);
-    const texture = new THREE.CanvasTexture(canvas);
-    texture.colorSpace = THREE.SRGBColorSpace;
-    this.badges.set(condition, texture);
+  /** A badge texture, made once per key and kept until the board goes. */
+  private badgeFor(key: string, make: () => THREE.CanvasTexture): THREE.CanvasTexture {
+    let texture = this.badges.get(key);
+    if (!texture) this.badges.set(key, (texture = make()));
     return texture;
   }
 
