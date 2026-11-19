@@ -27,9 +27,9 @@ function rowsOf(cards: Card[]): Row[] {
   });
 }
 
-type Props = { title: string; cards: Card[]; boosts: string[]; align?: "left" | "right"; /** Fold the list to its live sets and the closest one until it is opened. */ folds?: boolean };
+type Props = { title: string; cards: Card[]; boosts: string[]; align?: "left" | "right"; /** Fold the list to its live sets and the closest one until it is opened. */ folds?: boolean; /** A fight just started: the live rows flash once. */ pulse?: boolean };
 
-export function Checks({ title, cards, boosts, align = "left", folds = false }: Props) {
+export function Checks({ title, cards, boosts, align = "left", folds = false, pulse = false }: Props) {
   const [opened, setOpened] = useState(false);
   const rows = rowsOf(cards);
   const held = boosts.flatMap((id) => boostById(id) ?? []);
@@ -38,7 +38,7 @@ export function Checks({ title, cards, boosts, align = "left", folds = false }: 
   const foldable = folds && rows.length > foldedCount(rows);
   const shown = foldable && !opened ? rows.slice(0, foldedCount(rows)) : rows;
   return (
-    <div className={`checks pointer-events-auto ${align === "right" ? "checks-right" : ""}`} aria-label={`${passing} of ${rows.length} set bonuses live`}>
+    <div className={`checks pointer-events-auto ${align === "right" ? "checks-right" : ""}`} data-pulse={pulse ? "" : undefined} aria-label={`${passing} of ${rows.length} set bonuses live`}>
       {foldable ? (
         <button type="button" className="checks-head checks-toggle" aria-expanded={opened} onClick={() => setOpened(!opened)}>
           <span className="truncate">{title}</span>

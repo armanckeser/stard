@@ -137,7 +137,7 @@ export function popOf(id: string): Source & { line: string | null } {
 export const effectsOf = (id: string): Effect[] => hookOf(id)?.effects ?? [];
 
 /** When the thing behind an event's id fires and what it does first; a set's words are its two-card bonus. */
-function hookOf(id: string): { on: Trigger; when?: Gate; effects: Effect[] } | null {
+export function hookOf(id: string): { on: Trigger; when?: Gate; effects: Effect[] } | null {
   if (id.startsWith("set:")) return bonusOf(id.slice("set:".length)).tiers[0];
   if (id.startsWith("boost:")) return boostById(id.slice("boost:".length)) ?? null;
   if (id.startsWith("class:")) return classHookOf(id.slice("class:".length));
