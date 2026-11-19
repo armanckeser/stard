@@ -85,9 +85,12 @@ const POP_LIFE = 900;
 const BAR_WIDTH = 0.84;
 /** Seconds from a ranged card's ability hit to its number: when a melee lunge lands, which effects/damage.ts times its shard to. */
 const ABILITY_HIT_LANDS = 0.11;
-/** Diff chips, as GitHub draws a removed and an added line: damage is a red −12, healing a green +12. */
+/** Diff chips, as GitHub draws a removed and an added line, for the rare moments: a shield raised (✓) or broken (✗). */
 const REMOVED = { color: "#ffd7d5", chip: "#8e1519" };
 const ADDED = { color: "#d2fedb", chip: "#116329" };
+/** Hits and heals are plain numbers so a busy fight stays readable; only a crit gets a chip, so it stands out. */
+const DAMAGE = { color: "#ffd7d5" };
+const HEAL = { color: "#7ee2a8" };
 const CRITICAL = { color: "#3b2300", chip: "#ffd84d" };
 /** A tank lifts this high before it slams down; an assassin dashes this far past the usual reach. */
 const SLAM_LIFT = 0.28;
@@ -780,7 +783,7 @@ export class BoardWorld {
       this.fill(actor, event.change < 0);
       if (quick) return;
       if (event.change > 0) actor.flash = 0.5;
-      this.label(this.over(actor, 0.25), event.change > 0 ? `+${event.change}` : `−${-event.change}`, event.change > 0 ? ADDED : { color: CONDITION_COLOR[event.cause as Condition] ?? "#ff8f93" });
+      this.label(this.over(actor, 0.25), event.change > 0 ? `+${event.change}` : `−${-event.change}`, event.change > 0 ? HEAL : { color: CONDITION_COLOR[event.cause as Condition] ?? "#ff8f93" });
     } else if (event.kind === "issues") {
       // Open issues read as GitHub's: a green ◉ and how many; a heal closes them all, ✓.
       if (quick) return;
@@ -815,7 +818,7 @@ export class BoardWorld {
           if (event.critical) this.shake = 0.12;
           if (fainted) this.stopped = HIT_STOP;
         }
-        this.label(this.over(target, 0.25), `−${event.damage}`, event.critical ? { ...CRITICAL, size: 21, pop: 1.5 } : REMOVED);
+        this.label(this.over(target, 0.25), `−${event.damage}`, event.critical ? { ...CRITICAL, size: 21, pop: 1.5 } : DAMAGE);
       };
       const cast = this.cast;
       const fromAbility = cast !== null && cast.side === event.side && cast.unit === event.unit && cast.t === event.t;
