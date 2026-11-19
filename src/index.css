@@ -1163,7 +1163,7 @@ button.hud-chip:hover {
   }
 }
 
-/* What fired over a creature, in the gif and middle fight looks (src/components/battle/three/look.ts): its name as a small gold word, its foot above the HP bar, for under a second. */
+/* What fired over a creature: its name as a small gold word, its foot above the HP bar, for under a second. */
 .ability-pop {
   position: absolute;
   z-index: 5;
