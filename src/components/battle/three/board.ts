@@ -61,6 +61,10 @@ type Actor = {
   charged: number;
   grow: number;
   lunge: THREE.Vector3;
+  /** Which attack owns the lunge: a newer one takes over, and an older one's tweens stop writing it, so two never fight frame by frame. */
+  lungeOwner: number;
+  /** When the current attack's lunge is back home. */
+  lungeUntil: number;
   /** A shove from the last hit, away from the hitter, that dies out on its own. */
   knock: THREE.Vector3;
   flash: number;
@@ -627,7 +631,7 @@ export class BoardWorld {
     creature.root.rotation.order = "YXZ";
     this.scene.add(creature.root, bar);
     const home = homeOf(unit);
-    const actor = { unit, creature, home, at: home.clone(), facing: 0, hp: unit.fighter.hp, shield: 0, bar, fill, shieldFill, trailFill, trail: 1, trailHold: 0, attachments: new Map(), badge, issueBadge, charge, charged: 0, grow: 0, lunge: new THREE.Vector3(), knock: new THREE.Vector3(), flash: 0, squash: 0, squashSpeed: 0, tilt: 0, out: false, won: false } as Omit<Actor, "view"> as Actor;
+    const actor = { unit, creature, home, at: home.clone(), facing: 0, hp: unit.fighter.hp, shield: 0, bar, fill, shieldFill, trailFill, trail: 1, trailHold: 0, attachments: new Map(), badge, issueBadge, charge, charged: 0, grow: 0, lunge: new THREE.Vector3(), lungeOwner: 0, lungeUntil: 0, knock: new THREE.Vector3(), flash: 0, squash: 0, squashSpeed: 0, tilt: 0, out: false, won: false } as Omit<Actor, "view"> as Actor;
     this.charge(actor, 0);
     actor.view = {
       side: unit.side,
@@ -847,10 +851,20 @@ export class BoardWorld {
         // Only a crit gets a number; a hit shows as the flash, the knock-back and the HP bar.
         if (event.critical) this.label(this.over(target, 0.25), `−${event.damage}`, { ...CRITICAL, size: 21, pop: 1.5 });
       };
+      // An attack can start before the last one's lunge is home (a fast card), and an ability's extra hit
+      // lands in the same tick as the attack that set it off. Each new lunge starts from where the creature is
+      // and owns the lunge from then on; an extra hit during a lunge rides on it instead of starting another.
+      let owner = 0;
+      const mine = (update: (k: number) => void) => (k: number) => {
+        if (actor.lungeOwner === owner) update(k);
+      };
+      const from = actor.lunge.clone();
+      const busy = this.now < actor.lungeUntil;
       if (reduced) {
         land();
-      } else if (fromAbility && actor.unit.ranged) {
-        // An ability's damage flies as its own shard (effects/damage.ts), so the card's ball would be a second shot.
+      } else if (fromAbility && (actor.unit.ranged || busy)) {
+        // A ranged ability's damage flies as its own shard (effects/damage.ts), so the card's ball would be a second shot;
+        // a melee card mid-lunge already reaches the target, so a second lunge would only fight the first.
         this.after(ABILITY_HIT_LANDS, land);
       } else if (actor.unit.ranged) {
         const shot = new THREE.Mesh(sphere(0.11, 10), new THREE.MeshBasicMaterial({ color: actor.unit.fighter.color && /^#[0-9a-f]{6}$/i.test(actor.unit.fighter.color) ? actor.unit.fighter.color : 0xffffff }));
@@ -859,8 +873,11 @@ export class BoardWorld {
         this.scene.add(shot);
         actor.squash = 0.14;
         // A throw: the thrower rocks back, and the shot leaves fast and slows as it arrives.
-        this.tween(0, 0.05, (k) => actor.lunge.copy(away).multiplyScalar(-0.1 * easeOut(k)));
-        this.tween(0.05, 0.15, (k) => actor.lunge.copy(away).multiplyScalar(-0.1 * (1 - easeOut(k))));
+        const rock = away.clone().multiplyScalar(-0.1);
+        owner = ++actor.lungeOwner;
+        actor.lungeUntil = this.now + 0.2;
+        this.tween(0, 0.05, mine((k) => actor.lunge.lerpVectors(from, rock, easeOut(k))));
+        this.tween(0.05, 0.15, mine((k) => actor.lunge.copy(rock).multiplyScalar(1 - easeOut(k))));
         this.tween(0, 0.22, (k) => {
           const along = 1 - (1 - k) ** 2;
           shot.position.lerpVectors(from, to, along).setY(from.y + (to.y - from.y) * along + Math.sin(along * Math.PI) * 0.5);
@@ -873,29 +890,35 @@ export class BoardWorld {
         // A tank's hit is a slam: it rises, comes down on the target, and the floor shakes out.
         const lift = new THREE.Vector3(0, SLAM_LIFT, 0).addScaledVector(away, -WIND_UP);
         const reach = away.clone().multiplyScalar(REACH * 0.7);
-        this.tween(0, SLAM_TIME, (k) => actor.lunge.copy(lift).multiplyScalar(easeOut(k)));
-        this.tween(SLAM_TIME, ABILITY_HIT_LANDS * 0.7, (k) => actor.lunge.lerpVectors(lift, reach, k * k), () => {
+        owner = ++actor.lungeOwner;
+        actor.lungeUntil = this.now + SLAM_TIME + ABILITY_HIT_LANDS * 0.7 + 0.24;
+        this.tween(0, SLAM_TIME, mine((k) => actor.lunge.lerpVectors(from, lift, easeOut(k))));
+        this.tween(SLAM_TIME, ABILITY_HIT_LANDS * 0.7, mine((k) => actor.lunge.lerpVectors(lift, reach, k * k)), () => {
           land();
           target.knock.addScaledVector(away, KNOCK);
           this.floorRing(target.at, "#c9d1d9", 0.3);
         });
-        this.tween(SLAM_TIME + ABILITY_HIT_LANDS * 0.7, 0.24, (k) => actor.lunge.copy(reach).multiplyScalar(1 - easeOut(k)));
+        this.tween(SLAM_TIME + ABILITY_HIT_LANDS * 0.7, 0.24, mine((k) => actor.lunge.copy(reach).multiplyScalar(1 - easeOut(k))));
       } else if (!fromAbility && roleOfUnit(actor.unit) === "assassin") {
         // An assassin's hit is a dash: no wind-up, in fast and past, and a slash across the target.
         const reach = away.clone().multiplyScalar(DASH_REACH);
-        this.tween(0, DASH_TIME, (k) => actor.lunge.copy(reach).multiplyScalar(easeOut(k)), () => {
+        owner = ++actor.lungeOwner;
+        actor.lungeUntil = this.now + DASH_TIME + 0.16;
+        this.tween(0, DASH_TIME, mine((k) => actor.lunge.lerpVectors(from, reach, easeOut(k))), () => {
           land();
           this.slash(target, away);
         });
-        this.tween(DASH_TIME, 0.16, (k) => actor.lunge.copy(reach).multiplyScalar(1 - easeOut(k)));
+        this.tween(DASH_TIME, 0.16, mine((k) => actor.lunge.copy(reach).multiplyScalar(1 - easeOut(k))));
       } else {
         // An ability's lunge lands when effects/damage.ts's shard does, so only a plain hit draws back first.
         const windUp = fromAbility ? 0 : WIND_UP_TIME;
-        const back = away.clone().multiplyScalar(windUp ? -WIND_UP : 0);
+        const back = windUp ? away.clone().multiplyScalar(-WIND_UP) : from;
         const reach = away.clone().multiplyScalar(REACH);
-        if (windUp) this.tween(0, windUp, (k) => actor.lunge.copy(back).multiplyScalar(easeOut(k)));
-        this.tween(windUp, ABILITY_HIT_LANDS, (k) => actor.lunge.lerpVectors(back, reach, easeOut(k)), land);
-        this.tween(windUp + ABILITY_HIT_LANDS, 0.2, (k) => actor.lunge.copy(reach).multiplyScalar(1 - easeOut(k)));
+        owner = ++actor.lungeOwner;
+        actor.lungeUntil = this.now + windUp + ABILITY_HIT_LANDS + 0.2;
+        if (windUp) this.tween(0, windUp, mine((k) => actor.lunge.lerpVectors(from, back, easeOut(k))));
+        this.tween(windUp, ABILITY_HIT_LANDS, mine((k) => actor.lunge.lerpVectors(back, reach, easeOut(k))), land);
+        this.tween(windUp + ABILITY_HIT_LANDS, 0.2, mine((k) => actor.lunge.copy(reach).multiplyScalar(1 - easeOut(k))));
       }
     }
   }
