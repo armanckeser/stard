@@ -96,7 +96,7 @@ function litMaterial(): THREE.MeshToonMaterial {
   material.onBeforeCompile = (shader) => {
     shader.vertexShader = shader.vertexShader
       .replace("#include <color_pars_vertex>", "#include <color_pars_vertex>\nvarying float vFlash;")
-      .replace("vColor.xyz *= batchingColor.xyz;", "vFlash = batchingColor.x;");
+      .replace("#include <color_vertex>", THREE.ShaderChunk.color_vertex.replace("vColor.xyz *= batchingColor.xyz;", "vFlash = batchingColor.x;"));
     shader.fragmentShader = shader.fragmentShader
       .replace("#include <color_pars_fragment>", "#include <color_pars_fragment>\nvarying float vFlash;")
       .replace("#include <emissivemap_fragment>", "#include <emissivemap_fragment>\ntotalEmissiveRadiance += vec3( vFlash );");
