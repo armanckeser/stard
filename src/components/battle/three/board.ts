@@ -298,6 +298,7 @@ export class BoardWorld {
     this.ring.visible = false;
     this.scene.add(this.ring);
     this.scene.add(this.crowd.root);
+    this.scene.matrixWorldAutoUpdate = false;
 
     this.observer = new ResizeObserver(() => this.resize());
     this.observer.observe(host);
@@ -1168,6 +1169,8 @@ export class BoardWorld {
     this.tweens = [...kept, ...this.tweens];
 
     this.pose(seconds, held ? 0 : seconds);
+    // The world matrices are worked out once, here, for the crowd and the renderer both.
+    this.scene.updateMatrixWorld();
     this.crowd.sync();
     this.renderer.render(this.scene, this.camera);
   };

@@ -160,10 +160,9 @@ export class Crowd {
     if (member) member.flash = glow;
   }
 
-  /** Copies every part's place, and whether its creature shows, into the batches. Call after posing, before rendering. */
+  /** Copies every part's place, and whether its creature shows, into the batches. Call after the scene's world matrices are up to date, before rendering. */
   sync() {
     for (const { creature, pieces, flash } of this.members.values()) {
-      creature.root.updateMatrixWorld(true);
       const shown = creature.root.visible && creature.root.parent !== null;
       for (const piece of pieces) {
         piece.batch.mesh.setVisibleAt(piece.instanceId, shown);
