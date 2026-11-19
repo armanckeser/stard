@@ -132,6 +132,9 @@ const POP_LIFE = 900;
 const NAME_GAP = 0.32;
 const NAME_REPEAT = 2.4;
 const MIDDLE_REPEAT = 3.5;
+/** Fires per second from which the middle look draws a source as regular, then as constant (tierOf). */
+const REGULAR_RATE = 0.35;
+const CONSTANT_RATE = 1;
 
 /** A run card's role (a plain battle's fighters have no card, and strike as before). */
 const roleOfUnit = (unit: BoardUnit) => {
@@ -223,6 +226,9 @@ export class BoardWorld {
   private disposed = false;
   /** How much the fight writes on the board (look.ts). */
   private look = fightLook();
+  /** Fires per second of each ability, set and boost in the fight being played, and the ones already named for a team. */
+  private rates = new Map<string, number>();
+  private sideNamed = new Set<string>();
   /** What an effect may touch on this board (effects/stage.ts). */
   private stage: EffectStage;
 
@@ -416,7 +422,16 @@ export class BoardWorld {
   play(fight: BoardFight) {
     if (this.fight?.key === fight.key) return;
     this.fight = { ...fight, next: 0, time: -0.6, done: false };
-    for (const actor of this.actors.values()) this.charge(actor, 0);
+    for (const actor of this.actors.values()) {
+      this.charge(actor, 0);
+      actor.told.clear();
+      actor.named.clear();
+    }
+    // How often each ability, set and boost fires in this fight, per second: the middle look draws the busy ones quietly.
+    const seconds = Math.max(1, ((fight.events.at(-1)?.t ?? 0) * TICK_MS) / 1000);
+    this.rates.clear();
+    this.sideNamed.clear();
+    for (const event of fight.events) if (event.kind === "ability" && event.t > 0) this.rates.set(event.ability, (this.rates.get(event.ability) ?? 0) + 1 / seconds);
     this.selected = null;
     this.drag = null;
   }
@@ -803,7 +818,23 @@ export class BoardWorld {
       else if (hook?.on === "start" && hook.effects.every((effect) => effect.kind === "stat" || effect.kind === "shield")) {
         actor.flash = Math.max(actor.flash, 0.6);
         return;
-      } else if (this.look === "middle") this.name(actor, event.ability);
+      } else if (this.look === "middle") {
+        // Loudness follows how often the thing fires this fight. A rare one is named every time; a regular one the first time
+        // on each card; a constant one (lifesteal on every attack) is named once per team and plays its effect once per card,
+        // then only flashes the card.
+        const tier = this.tierOf(event.ability);
+        const first = !actor.told.has(`fired:${event.ability}`);
+        actor.told.add(`fired:${event.ability}`);
+        if (tier === "constant" && !first) {
+          actor.flash = Math.max(actor.flash, 0.3);
+          return;
+        }
+        const team = `${event.side}:${event.ability}`;
+        if (tier === "rare" || (first && (tier === "regular" || !this.sideNamed.has(team)))) {
+          this.sideNamed.add(team);
+          this.name(actor, event.ability, tier === "rare");
+        }
+      }
       const ids = fight.ids;
       const reached = (onFoes: boolean) => {
         const side = onFoes === (event.side === 0) ? 1 : 0;
@@ -823,7 +854,10 @@ export class BoardWorld {
       if (this.look === "gif" && event.change < 0) this.label(this.over(actor, 0.25), String(event.change), { color: CONDITION_COLOR[event.cause as Condition] ?? "#ff8f93" });
       if (event.change > 0) {
         actor.flash = 0.5;
-        this.label(this.over(actor, 0.25), `+${event.change}`, HEAL);
+        // A constant heal (lifesteal) shows its number the first time on each card, then only the HP bar fills.
+        const quiet = this.look === "middle" && this.tierOf(event.cause) === "constant" && actor.told.has(`healed:${event.cause}`);
+        actor.told.add(`healed:${event.cause}`);
+        if (!quiet) this.label(this.over(actor, 0.25), `+${event.change}`, HEAL);
       }
     } else if (event.kind === "issues") {
       // Open issues read as GitHub's: the green issue icon and how many, beside the HP bar; a heal closes them all.
@@ -1026,6 +1060,14 @@ export class BoardWorld {
     }, life);
   }
 
+  /** How often `source` fires in this fight: measured on 120 round-3 and round-5 fights, lifesteal, thorns, the apps set and
+   * combo fire 1 to 3 times a second; revert, open issues and add tests about once every 1-2 s; blast radius, hotfix and
+   * legacy code less than once every 3 s. */
+  private tierOf(source: string): "rare" | "regular" | "constant" {
+    const rate = this.rates.get(source) ?? 0;
+    return rate >= CONSTANT_RATE ? "constant" : rate >= REGULAR_RATE ? "regular" : "rare";
+  }
+
   /** The name of what fired, a small gold word over the creature for under a second. It sits above the HP bar, never on it. */
   private pop(at: THREE.Vector3, id: string) {
     const name = sourceOf(id).name;
@@ -1044,10 +1086,10 @@ export class BoardWorld {
   }
 
   /** Names what fired over the creature: in the gif look each name at most every NAME_REPEAT, in the middle look any name at most every MIDDLE_REPEAT. */
-  private name(actor: Actor, id: string) {
+  private name(actor: Actor, id: string, rare = false) {
     const key = this.look === "gif" ? id : "any";
     const last = actor.named.get(key);
-    if (last !== undefined && this.now - last < (this.look === "gif" ? NAME_REPEAT : MIDDLE_REPEAT)) return;
+    if (!rare && last !== undefined && this.now - last < (this.look === "gif" ? NAME_REPEAT : MIDDLE_REPEAT)) return;
     actor.named.set(key, this.now);
     const at = Math.max(this.now, actor.nextName);
     actor.nextName = at + NAME_GAP;
