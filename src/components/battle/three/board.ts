@@ -13,7 +13,6 @@ import { buildCreature, type Creature } from "./creature";
 import { Crowd } from "./crowd";
 import { playFired, SHIELD_KEY, type EffectActor, type EffectStage } from "./effects";
 import { CONDITION_COLOR, EFFECT_COLOR, ISSUE_COLOR } from "./effects/stage";
-import { fightLook } from "./look";
 import { CONDITION_ICON, iconTexture } from "./octicons";
 import { dispose, easeOut, overshoot, part, sphere, toon } from "./kit";
 import { buildTrainer, type Trainer } from "./trainer";
@@ -61,10 +60,10 @@ type Actor = {
   charge: THREE.Mesh[] | null;
   /** Attacks made since the ability last fired. */
   charged: number;
-  /** When each name (or, in the middle look, any name) last showed over the creature, and when the next may show. */
-  named: Map<string, number>;
+  /** When a name last showed over the creature, and when the next may show. */
+  named: number;
   nextName: number;
-  /** Conditions whose word has shown on this creature this fight (the middle look says each once). */
+  /** Conditions whose word has shown on this creature this fight (each is said once). */
   told: Set<string>;
   grow: number;
   lunge: THREE.Vector3;
@@ -129,11 +128,10 @@ const FAINT_TILT_TIME = 0.12;
 const EASE_OUT = "cubic-bezier(0.23, 1, 0.32, 1)";
 /** How long a name stays over the creature, in milliseconds. */
 const POP_LIFE = 900;
-/** Names over one creature show at least this far apart, and the same name at most this often, in fight seconds; the middle look names a creature at most every MIDDLE_REPEAT. */
+/** Names over one creature show at least this far apart, and any name at most this often, in fight seconds. */
 const NAME_GAP = 0.32;
-const NAME_REPEAT = 2.4;
-const MIDDLE_REPEAT = 3.5;
-/** Fires per second from which the middle look draws a source as regular, then as constant (tierOf). */
+const NAME_REPEAT = 3.5;
+/** Fires per second from which a fight draws a source as regular, then as constant (tierOf). */
 const REGULAR_RATE = 0.35;
 const CONSTANT_RATE = 1;
 
@@ -227,8 +225,6 @@ export class BoardWorld {
   private labels = new Set<HTMLElement>();
   private badges = new Map<string, THREE.CanvasTexture>();
   private disposed = false;
-  /** How much the fight writes on the board (look.ts). */
-  private look = fightLook();
   /** Fires per second of each ability, set and boost in the fight being played, and the ones already named for a team. */
   private rates = new Map<string, number>();
   private sideNamed = new Set<string>();
@@ -396,7 +392,7 @@ export class BoardWorld {
         actor.bar.visible = unit.bench === undefined;
         actor.badge.visible = false;
         actor.issueBadge.visible = false;
-        actor.named.clear();
+        actor.named = -Infinity;
         actor.nextName = 0;
         actor.told.clear();
         this.charge(actor, 0);
@@ -431,9 +427,9 @@ export class BoardWorld {
     for (const actor of this.actors.values()) {
       this.charge(actor, 0);
       actor.told.clear();
-      actor.named.clear();
+      actor.named = -Infinity;
     }
-    // How often each ability, set and boost fires in this fight, per second: the middle look draws the busy ones quietly.
+    // How often each ability, set and boost fires in this fight, per second: the busy ones are drawn quietly.
     const seconds = Math.max(1, ((fight.events.at(-1)?.t ?? 0) * TICK_MS) / 1000);
     this.rates.clear();
     this.sideNamed.clear();
@@ -644,10 +640,8 @@ export class BoardWorld {
     trailFill.renderOrder = 11;
     fill.renderOrder = 11;
     shieldFill.renderOrder = 11;
-    const worded = this.look === "gif";
-    const badge = new THREE.Mesh(worded ? new THREE.PlaneGeometry(0.84, 0.21) : new THREE.PlaneGeometry(0.26, 0.26), new THREE.MeshBasicMaterial({ depthTest: false, transparent: true }));
-    if (worded) badge.position.set(0, 0.19, 0.004);
-    else badge.position.set(BAR_WIDTH / 2 + 0.17, 0, 0.004);
+    const badge = new THREE.Mesh(new THREE.PlaneGeometry(0.26, 0.26), new THREE.MeshBasicMaterial({ depthTest: false, transparent: true }));
+    badge.position.set(BAR_WIDTH / 2 + 0.17, 0, 0.004);
     badge.renderOrder = 12;
     badge.visible = false;
     // The badge picks its creature as the body does (actorUnder).
@@ -657,7 +651,7 @@ export class BoardWorld {
     issueBadge.renderOrder = 12;
     issueBadge.visible = false;
     bar.add(back, trailFill, fill, shieldFill, badge, issueBadge);
-    const charge = !worded && abilityHooks((unit.fighter as { card?: Card }).card?.ability ?? "").some((hook) => hook.on === "third")
+    const charge = abilityHooks((unit.fighter as { card?: Card }).card?.ability ?? "").some((hook) => hook.on === "third")
       ? [-1, 0, 1].map((i) => {
           const square = new THREE.Mesh(new THREE.PlaneGeometry(0.1, 0.05), new THREE.MeshBasicMaterial({ color: EFFECT_COLOR.fired, depthTest: false, transparent: true }));
           square.position.set(i * 0.13, -0.1, 0.004);
@@ -670,7 +664,7 @@ export class BoardWorld {
     creature.root.rotation.order = "YXZ";
     this.scene.add(creature.root, bar);
     const home = homeOf(unit);
-    const actor = { unit, creature, home, at: home.clone(), facing: 0, hp: unit.fighter.hp, shield: 0, bar, fill, shieldFill, trailFill, trail: 1, trailHold: 0, attachments: new Map(), badge, issueBadge, charge, charged: 0, named: new Map(), nextName: 0, told: new Set(), grow: 0, lunge: new THREE.Vector3(), lungeOwner: 0, lungeUntil: 0, knock: new THREE.Vector3(), flash: 0, squash: 0, squashSpeed: 0, tilt: 0, out: false, won: false } as Omit<Actor, "view"> as Actor;
+    const actor = { unit, creature, home, at: home.clone(), facing: 0, hp: unit.fighter.hp, shield: 0, bar, fill, shieldFill, trailFill, trail: 1, trailHold: 0, attachments: new Map(), badge, issueBadge, charge, charged: 0, named: -Infinity, nextName: 0, told: new Set(), grow: 0, lunge: new THREE.Vector3(), lungeOwner: 0, lungeUntil: 0, knock: new THREE.Vector3(), flash: 0, squash: 0, squashSpeed: 0, tilt: 0, out: false, won: false } as Omit<Actor, "view"> as Actor;
     this.charge(actor, 0);
     actor.view = {
       side: unit.side,
@@ -823,11 +817,10 @@ export class BoardWorld {
       // so the board doesn't jump; the set panel already says which sets are live. A shield puts its shell on, unnamed:
       // where the shields are tells a player where to look.
       const hook = hookOf(event.ability);
-      if (this.look === "gif") this.name(actor, event.ability);
-      else if (hook?.on === "start" && hook.effects.every((effect) => effect.kind === "stat" || effect.kind === "shield")) {
+      if (hook?.on === "start" && hook.effects.every((effect) => effect.kind === "stat" || effect.kind === "shield")) {
         actor.flash = Math.max(actor.flash, 0.6);
         if (!hook.effects.some((effect) => effect.kind === "shield")) return;
-      } else if (this.look === "middle") {
+      } else {
         // Loudness follows how often the thing fires this fight. A rare one is named every time; a regular one the first time
         // on each card; a constant one (lifesteal on every attack) is named once per team and plays its effect once per card,
         // then only flashes the card.
@@ -859,12 +852,11 @@ export class BoardWorld {
       actor.hp = Math.max(0, Math.min(actor.unit.fighter.hp, actor.hp + event.change));
       this.fill(actor, event.change < 0);
       if (quick) return;
-      // Only a heal gets a number: a bleed or an open issue shows as the HP bar draining (the gif look numbers both).
-      if (this.look === "gif" && event.change < 0) this.label(this.over(actor, 0.25), String(event.change), { color: CONDITION_COLOR[event.cause as Condition] ?? "#ff8f93" });
+      // Only a heal gets a number: a bleed or an open issue shows as the HP bar draining.
       if (event.change > 0) {
         actor.flash = 0.5;
         // A constant heal (lifesteal) shows its number the first time on each card, then only the HP bar fills.
-        const quiet = this.look === "middle" && this.tierOf(event.cause) === "constant" && actor.told.has(`healed:${event.cause}`);
+        const quiet = this.tierOf(event.cause) === "constant" && actor.told.has(`healed:${event.cause}`);
         actor.told.add(`healed:${event.cause}`);
         if (!quiet) this.label(this.over(actor, 0.25), `+${event.change}`, HEAL);
       }
@@ -881,10 +873,10 @@ export class BoardWorld {
       actor.badge.visible = event.on && condition in CONDITION_NAMES;
       if (actor.badge.visible) {
         const material = actor.badge.material as THREE.MeshBasicMaterial;
-        material.map = this.look === "gif" ? this.badgeFor(`word:${condition}`, () => wordTexture(condition)) : this.badgeFor(condition, () => iconTexture(CONDITION_ICON[condition], CONDITION_COLOR[condition]));
+        material.map = this.badgeFor(condition, () => iconTexture(CONDITION_ICON[condition], CONDITION_COLOR[condition]));
         material.needsUpdate = true;
-        // The middle look says the condition's word the first time it lands on a creature, then leaves the icon.
-        if (this.look === "middle" && !quick && !actor.told.has(condition)) {
+        // The condition's word shows the first time it lands on a creature, then the icon alone.
+        if (!quick && !actor.told.has(condition)) {
           actor.told.add(condition);
           this.label(this.over(actor, 0.45), CONDITION_NAMES[condition], { color: CONDITION_COLOR[condition], size: 13, life: 1100 });
         }
@@ -916,10 +908,9 @@ export class BoardWorld {
           if (event.critical) this.shake = 0.12;
           if (fainted) this.stopped = HIT_STOP;
         }
-        // Today only a crit gets a number; the gif and middle looks number every hit, the middle one small.
+        // Every hit gets a small number, a crit a big red one.
         if (event.critical) this.label(this.over(target, 0.25), `−${event.damage}`, { ...CRITICAL, size: 21, pop: 1.5 });
-        else if (this.look === "gif") this.label(this.over(target, 0.25), String(event.damage), {});
-        else if (this.look === "middle") this.label(this.over(target, 0.25), String(event.damage), { size: 12, pop: 1.1 });
+        else this.label(this.over(target, 0.25), String(event.damage), { size: 12, pop: 1.1 });
       };
       // An attack can start before the last one's lunge is home (a fast card), and an ability's extra hit
       // lands in the same tick as the attack that set it off. Each new lunge starts from where the creature is
@@ -938,10 +929,9 @@ export class BoardWorld {
         this.after(ABILITY_HIT_LANDS, land);
       } else if (actor.unit.ranged) {
         const color = actor.unit.fighter.color && /^#[0-9a-f]{6}$/i.test(actor.unit.fighter.color) ? actor.unit.fighter.color : 0xffffff;
-        const big = this.look === "middle";
-        const shot = new THREE.Mesh(sphere(big ? 0.15 : 0.11, 10), new THREE.MeshBasicMaterial({ color }));
-        // The middle look gives the shot a short trail of fading balls, so a throw reads across the board.
-        const trail = big ? [0.11, 0.08, 0.05].map((size, i) => new THREE.Mesh(sphere(size, 8), new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.5 - i * 0.14, depthWrite: false }))) : [];
+        const shot = new THREE.Mesh(sphere(0.15, 10), new THREE.MeshBasicMaterial({ color }));
+        // A short trail of fading balls behind the shot, so a throw reads across the board.
+        const trail = [0.11, 0.08, 0.05].map((size, i) => new THREE.Mesh(sphere(size, 8), new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.5 - i * 0.14, depthWrite: false })));
         const from = actor.at.clone().setY(actor.creature.height * SIZE * 0.6);
         const to = target.at.clone().setY(target.creature.height * SIZE * 0.5);
         this.scene.add(shot, ...trail);
@@ -1094,12 +1084,10 @@ export class BoardWorld {
     }, POP_LIFE);
   }
 
-  /** Names what fired over the creature: in the gif look each name at most every NAME_REPEAT, in the middle look any name at most every MIDDLE_REPEAT. */
+  /** Names what fired over the creature, at most one name every NAME_REPEAT; a rare source is named every time. */
   private name(actor: Actor, id: string, rare = false) {
-    const key = this.look === "gif" ? id : "any";
-    const last = actor.named.get(key);
-    if (!rare && last !== undefined && this.now - last < (this.look === "gif" ? NAME_REPEAT : MIDDLE_REPEAT)) return;
-    actor.named.set(key, this.now);
+    if (!rare && this.now - actor.named < NAME_REPEAT) return;
+    actor.named = this.now;
     const at = Math.max(this.now, actor.nextName);
     actor.nextName = at + NAME_GAP;
     const fight = this.fight;
@@ -1490,24 +1478,4 @@ export class BoardWorld {
     if (spot?.kind === "archive" && this.options.sellPrice(drag.id) !== null) this.archiving = drag.id;
     if (spot) this.options.onMove(drag.id, spot);
   };
-}
-
-/** The gif look's condition badge: the condition's word on a pill of its colour. */
-function wordTexture(condition: Condition): THREE.CanvasTexture {
-  const canvas = document.createElement("canvas");
-  canvas.width = 256;
-  canvas.height = 64;
-  const pen = canvas.getContext("2d")!;
-  pen.fillStyle = CONDITION_COLOR[condition];
-  pen.beginPath();
-  pen.roundRect(4, 6, 248, 52, 26);
-  pen.fill();
-  pen.fillStyle = "#0b0f14";
-  pen.font = "700 30px system-ui, sans-serif";
-  pen.textAlign = "center";
-  pen.textBaseline = "middle";
-  pen.fillText(CONDITION_NAMES[condition], 128, 33);
-  const texture = new THREE.CanvasTexture(canvas);
-  texture.colorSpace = THREE.SRGBColorSpace;
-  return texture;
 }
