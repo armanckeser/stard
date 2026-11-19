@@ -88,10 +88,10 @@ const ABILITY_HIT_LANDS = 0.11;
 /** Diff chips, as GitHub draws a removed and an added line, for the rare moments: a shield raised (✓) or broken (✗). */
 const REMOVED = { color: "#ffd7d5", chip: "#8e1519" };
 const ADDED = { color: "#d2fedb", chip: "#116329" };
-/** Hits and heals are plain numbers so a busy fight stays readable; only a crit gets a chip, so it stands out. */
+/** Hits, heals and crits are plain numbers so a busy fight stays readable; a crit stands out by being bigger, yellow and popping in. */
 const DAMAGE = { color: "#ffd7d5" };
 const HEAL = { color: "#7ee2a8" };
-const CRITICAL = { color: "#3b2300", chip: "#ffd84d" };
+const CRITICAL = { color: "#ffd84d" };
 /** A tank lifts this high before it slams down; an assassin dashes this far past the usual reach. */
 const SLAM_LIFT = 0.28;
 const SLAM_TIME = 0.1;
