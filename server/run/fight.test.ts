@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { fight, fightWith, MAX_TICKS } from "./fight.ts";
 import type { Hook, Rules } from "./hooks.ts";
-import { EVEN } from "./stats.ts";
+import { EVEN, roleOf } from "./stats.ts";
 import type { Card, FightEvent, Placed, Snapshot } from "./types.ts";
 
 const card = (fullName: string, over: Partial<Card> = {}): Card => ({ fullName, type: "web", sets: [], rarity: 0, hp: 150, attack: 100, guard: 100, speed: 100, range: 1, ability: "none", shiny: false, ...over });
@@ -44,11 +44,37 @@ describe("fight", () => {
     expect(events.find((event) => event.kind === "hit" && event.side === 0)).toMatchObject({ target: 1 });
   });
 
-  it("sends an assassin past the front row to the farthest card, in one leap", () => {
+  // Regression guarded: an assassin leapt to the back row at the start, which made a fight hard to follow.
+  it("sends an assassin at the most wounded enemy in its reach, past a tank, without leaping", () => {
     const assassin = card("greendale/assassin", { attack: 130, speed: 125, guard: 80 });
-    const events = fight(team("greendale", [at(assassin, 0, 1)]), team("city-college", [at(card("city-college/front", { attack: 1 }), 3), at(card("city-college/back", { attack: 1 }), 0, 1)]), "seed");
-    expect(events.find((event) => event.kind === "hit" && event.side === 0)).toMatchObject({ target: 1 });
-    expect(of(events, "move").filter((event) => event.side === 0)).toHaveLength(1);
+    // At the start the assassin's own test hook wounds the enemy with the least HP; the tank and the back-row card stay whole.
+    const wound = carrying([{ source: "test:wound", on: "start", effects: [{ kind: "damage", aim: "weakest-foe", power: 0.5 }] }]);
+    const events = fightWith(wound)(team("greendale", [at(assassin, 1)]), team("city-college", [at(card("city-college/tank", { hp: 300, attack: 1 }), 2), at(card("city-college/hurt", { hp: 120, attack: 1 }), 1), at(card("city-college/back", { attack: 1, speed: 1, range: 3 }), 3, 1)]), "seed");
+    const first = events.find((event) => event.kind === "hit" && event.side === 0 && event.t > 0);
+    expect(first).toMatchObject({ target: 1 });
+    expect(of(events, "move").filter((event) => event.side === 0)).toEqual([]);
+  });
+
+  it("lands an assassin's hits for about half again once the target is under half its HP", () => {
+    const target = card("city-college/dummy", { hp: 800, attack: 1, guard: 60 });
+    // The attacker carries a wall of shield, so it outlasts the dummy and lands hits on both halves of its HP.
+    const walled = fightWith(carrying([{ source: "test:wall", on: "start", effects: [{ kind: "shield", aim: "self", share: 100 }] }]));
+    const ratio = (attacker: Card) => {
+      let hp = target.hp;
+      const above: number[] = [];
+      const below: number[] = [];
+      for (const hit of of(walled(...duel(attacker, target), "seed"), "hit").filter((event) => event.side === 0 && !event.critical)) {
+        (hp < target.hp / 2 ? below : above).push(hit.damage);
+        hp -= hit.damage;
+      }
+      const mean = (list: number[]) => list.reduce((sum, value) => sum + value, 0) / list.length;
+      return mean(below) / mean(above);
+    };
+    const assassin = card("greendale/assassin", { attack: 130, speed: 125, guard: 80 });
+    const bruiser = card("greendale/bruiser", { attack: 130, speed: 125, guard: 170 });
+    expect([roleOf(assassin), roleOf(bruiser)]).toEqual(["assassin", "bruiser"]);
+    expect(ratio(assassin)).toBeGreaterThan(1.25);
+    expect(ratio(bruiser)).toBeLessThan(1.15);
   });
 
   it("stops at 45 seconds and gives the fight to the side with more HP left", () => {
