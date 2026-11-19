@@ -1163,6 +1163,50 @@ button.hud-chip:hover {
   }
 }
 
+/* What fired over a creature, in the gif and middle fight looks (src/components/battle/three/look.ts): its name as a small gold word, its foot above the HP bar, for under a second. */
+.ability-pop {
+  position: absolute;
+  z-index: 5;
+  font: 700 11px/1 var(--font-display);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #c9a45c;
+  text-shadow: 0 1px 0 #000, 0 0 6px rgb(0 0 0 / 0.9);
+  white-space: nowrap;
+  pointer-events: none;
+  translate: -50% -100%;
+  animation: ability-pop var(--life) ease-out both;
+}
+@keyframes ability-pop {
+  0% {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  15%,
+  70% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .ability-pop {
+    animation: ability-pop-still var(--life) linear both;
+  }
+  @keyframes ability-pop-still {
+    0%,
+    85% {
+      opacity: 1;
+    }
+    100% {
+      opacity: 0;
+    }
+  }
+}
+
 /* A panel over the board (docs/GAME-UI.md §2): the run's end (src/components/run/run-end.tsx) and a saved team (src/routes/team.tsx). Slate, the gold line on its outer edge only, one soft shadow. */
 .run-panel {
   display: flex;
