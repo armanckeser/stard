@@ -38,6 +38,9 @@ const FIRST_ACTION_SPREAD = 8;
 /** A hit lands for 70% to 130% of its damage. */
 const VARIANCE = 0.6;
 const THIRD = 3;
+/** An assassin finishes: its hit on a card under half its HP lands for this much more. */
+const FINISHER = 1.5;
+const FINISHER_BELOW = 0.5;
 
 type Scaled = "attack" | "guard" | "speed";
 
@@ -47,10 +50,6 @@ type Unit = {
   card: Card;
   /** How the card picks its target (targetOf), from its stats (roleOf). */
   role: Role;
-  /** Whether an assassin has spent its one leap. */
-  leapt: boolean;
-  /** The card an assassin hunts until it falls. */
-  mark?: Unit;
   x: number;
   y: number;
   hp: number;
@@ -268,7 +267,8 @@ function strike(arena: Arena, unit: Unit, target: Unit) {
     return;
   }
   const critical = arena.random() < unit.luck;
-  const damage = Math.max(1, Math.round(baseHit(unit, target) * (critical ? unit.critical : 1) * (1 - VARIANCE / 2 + arena.random() * VARIANCE)));
+  const finishing = unit.role === "assassin" && target.hp < target.card.hp * FINISHER_BELOW ? FINISHER : 1;
+  const damage = Math.max(1, Math.round(baseHit(unit, target) * finishing * (critical ? unit.critical : 1) * (1 - VARIANCE / 2 + arena.random() * VARIANCE)));
   wound(arena, unit, target, damage, critical);
   unit.hits++;
   rest(unit);
@@ -294,42 +294,19 @@ function step(arena: Arena, unit: Unit, target: Unit) {
   unit.next = arena.t + STEP_TICKS;
 }
 
-/** The farthest of `units`, then the one with the least HP, then the first placed. */
-function farthest(from: { x: number; y: number }, units: Unit[]): Unit | undefined {
-  return units.reduce<Unit | undefined>((best, unit) => {
-    if (!best) return unit;
-    const further = apart(from, best) - apart(from, unit) || unit.hp - best.hp || unit.index - best.index;
-    return further < 0 ? unit : best;
-  }, undefined);
-}
-
 /**
  * Who a card goes for. A tank in reach must be hit first (CODEOWNERS: it reviews everything
- * near it). An assassin ignores that and hunts the farthest card (@mention), the back row,
- * until it falls.
- * Everyone else takes the nearest.
+ * near it). An assassin ignores that and goes for the most wounded enemy in its reach, to
+ * finish it. Everyone else takes the nearest.
  */
 function targetOf(unit: Unit, enemies: Unit[]): Unit | undefined {
   if (unit.role === "assassin") {
-    if (!unit.mark || unit.mark.hp <= 0) unit.mark = farthest(unit, enemies);
-    return unit.mark;
+    const inReach = enemies.filter((enemy) => apart(unit, enemy) <= unit.card.range);
+    const weakest = inReach.reduce<Unit | undefined>((best, enemy) => (!best || enemy.hp / enemy.card.hp < best.hp / best.card.hp ? enemy : best), undefined);
+    return weakest ?? nearest(unit, enemies);
   }
   const tanks = enemies.filter((enemy) => enemy.role === "tank" && apart(unit, enemy) <= unit.card.range);
   return nearest(unit, tanks.length > 0 ? tanks : enemies);
-}
-
-/** An assassin's one leap: to the free cell next to its target that is nearest it, if there is one. */
-function leap(arena: Arena, unit: Unit, target: Unit): boolean {
-  const taken = (cell: { x: number; y: number }) => arena.units.some((other) => other.hp > 0 && other.x === cell.x && other.y === cell.y);
-  const cells = DIRECTIONS.map(({ dx, dy }) => ({ x: target.x + dx, y: target.y + dy })).filter((cell) => cell.x >= 0 && cell.x < COLS && cell.y >= 0 && cell.y < ROWS * 2 && !taken(cell));
-  const landing = cells.reduce<{ x: number; y: number } | null>((found, cell) => (!found || apart(unit, cell) < apart(unit, found) ? cell : found), null);
-  unit.leapt = true;
-  if (!landing) return false;
-  unit.x = landing.x;
-  unit.y = landing.y;
-  arena.events.push({ t: arena.t, kind: "move", side: unit.side, unit: unit.index, x: landing.x, y: landing.y });
-  unit.next = arena.t + STEP_TICKS;
-  return true;
 }
 
 function act(arena: Arena, unit: Unit) {
@@ -337,7 +314,7 @@ function act(arena: Arena, unit: Unit) {
   if (!target) return;
   if (apart(unit, target) <= unit.card.range) strike(arena, unit, target);
   // A card knocked out this tick still lands its hit, but does not walk.
-  else if (unit.hp > 0 && !(unit.role === "assassin" && !unit.leapt && leap(arena, unit, target))) step(arena, unit, target);
+  else if (unit.hp > 0) step(arena, unit, target);
 }
 
 const over = (arena: Arena) => standing(arena, 0).length === 0 || standing(arena, 1).length === 0;
@@ -354,7 +331,6 @@ export function fightWith(rules: Rules): Fight {
         index,
         card: placed.card,
         role: roleOf(placed.card),
-        leapt: false,
         ...cellOf(side, placed),
         hp: placed.card.hp,
         shield: 0,
