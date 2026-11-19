@@ -6,9 +6,13 @@ import { routeTree } from "./routeTree.gen";
 import "./index.css";
 import "./lib/session";
 import "./lib/collections";
+import { fightLook } from "./components/battle/three/look";
 
 // BASE_URL is Vite's `base`: "/" normally, "/github-stars-organizer/" for the
 // demo on GitHub Pages, which serves a project site under the repo name.
+// Keep a ?look= pick before the router drops search params it doesn't know.
+fightLook();
+
 const router = createRouter({ routeTree, basepath: import.meta.env.BASE_URL });
 
 declare module "@tanstack/react-router" {
