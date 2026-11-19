@@ -811,13 +811,14 @@ export class BoardWorld {
       this.cast = { side: event.side, unit: event.unit, t: event.t };
       if (actor.charge && hookOf(event.ability)?.on === "third") this.after(quick ? 0 : 0.3, () => this.charge(actor, 0));
       if (quick) return;
-      // At fight start every set bonus and boost fires on every card it lifts. A buff there is a short glow and no more,
-      // so the board doesn't jump; the set panel already says which sets are live.
+      // At fight start every set bonus and boost fires on every card it lifts. A stat buff there is a short glow and no more,
+      // so the board doesn't jump; the set panel already says which sets are live. A shield puts its shell on, unnamed:
+      // where the shields are tells a player where to look.
       const hook = hookOf(event.ability);
       if (this.look === "gif") this.name(actor, event.ability);
       else if (hook?.on === "start" && hook.effects.every((effect) => effect.kind === "stat" || effect.kind === "shield")) {
         actor.flash = Math.max(actor.flash, 0.6);
-        return;
+        if (!hook.effects.some((effect) => effect.kind === "shield")) return;
       } else if (this.look === "middle") {
         // Loudness follows how often the thing fires this fight. A rare one is named every time; a regular one the first time
         // on each card; a constant one (lifesteal on every attack) is named once per team and plays its effect once per card,
