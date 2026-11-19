@@ -858,7 +858,7 @@ export class BoardWorld {
       const mine = (update: (k: number) => void) => (k: number) => {
         if (actor.lungeOwner === owner) update(k);
       };
-      const from = actor.lunge.clone();
+      const start = actor.lunge.clone();
       const busy = this.now < actor.lungeUntil;
       if (reduced) {
         land();
@@ -876,7 +876,7 @@ export class BoardWorld {
         const rock = away.clone().multiplyScalar(-0.1);
         owner = ++actor.lungeOwner;
         actor.lungeUntil = this.now + 0.2;
-        this.tween(0, 0.05, mine((k) => actor.lunge.lerpVectors(from, rock, easeOut(k))));
+        this.tween(0, 0.05, mine((k) => actor.lunge.lerpVectors(start, rock, easeOut(k))));
         this.tween(0.05, 0.15, mine((k) => actor.lunge.copy(rock).multiplyScalar(1 - easeOut(k))));
         this.tween(0, 0.22, (k) => {
           const along = 1 - (1 - k) ** 2;
@@ -892,7 +892,7 @@ export class BoardWorld {
         const reach = away.clone().multiplyScalar(REACH * 0.7);
         owner = ++actor.lungeOwner;
         actor.lungeUntil = this.now + SLAM_TIME + ABILITY_HIT_LANDS * 0.7 + 0.24;
-        this.tween(0, SLAM_TIME, mine((k) => actor.lunge.lerpVectors(from, lift, easeOut(k))));
+        this.tween(0, SLAM_TIME, mine((k) => actor.lunge.lerpVectors(start, lift, easeOut(k))));
         this.tween(SLAM_TIME, ABILITY_HIT_LANDS * 0.7, mine((k) => actor.lunge.lerpVectors(lift, reach, k * k)), () => {
           land();
           target.knock.addScaledVector(away, KNOCK);
@@ -904,7 +904,7 @@ export class BoardWorld {
         const reach = away.clone().multiplyScalar(DASH_REACH);
         owner = ++actor.lungeOwner;
         actor.lungeUntil = this.now + DASH_TIME + 0.16;
-        this.tween(0, DASH_TIME, mine((k) => actor.lunge.lerpVectors(from, reach, easeOut(k))), () => {
+        this.tween(0, DASH_TIME, mine((k) => actor.lunge.lerpVectors(start, reach, easeOut(k))), () => {
           land();
           this.slash(target, away);
         });
@@ -912,11 +912,11 @@ export class BoardWorld {
       } else {
         // An ability's lunge lands when effects/damage.ts's shard does, so only a plain hit draws back first.
         const windUp = fromAbility ? 0 : WIND_UP_TIME;
-        const back = windUp ? away.clone().multiplyScalar(-WIND_UP) : from;
+        const back = windUp ? away.clone().multiplyScalar(-WIND_UP) : start;
         const reach = away.clone().multiplyScalar(REACH);
         owner = ++actor.lungeOwner;
         actor.lungeUntil = this.now + windUp + ABILITY_HIT_LANDS + 0.2;
-        if (windUp) this.tween(0, windUp, mine((k) => actor.lunge.lerpVectors(from, back, easeOut(k))));
+        if (windUp) this.tween(0, windUp, mine((k) => actor.lunge.lerpVectors(start, back, easeOut(k))));
         this.tween(windUp, ABILITY_HIT_LANDS, mine((k) => actor.lunge.lerpVectors(back, reach, easeOut(k))), land);
         this.tween(windUp + ABILITY_HIT_LANDS, 0.2, mine((k) => actor.lunge.copy(reach).multiplyScalar(1 - easeOut(k))));
       }
