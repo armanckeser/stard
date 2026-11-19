@@ -10,6 +10,7 @@ import { roleOf } from "../../../../server/run/stats";
 import { COLS, ROWS, TICK_MS, type Card, type FightEvent, type Side } from "../../../../server/run/types";
 import { ARCHIVE_DEPTH, ARCHIVE_WIDTH, buildArchive, type Archive } from "./archive";
 import { buildCreature, type Creature } from "./creature";
+import { Crowd } from "./crowd";
 import { playFired, SHIELD_KEY, type EffectActor, type EffectStage } from "./effects";
 import { CONDITION_COLOR, EFFECT_COLOR, ISSUE_COLOR } from "./effects/stage";
 import { fightLook } from "./look";
@@ -179,6 +180,8 @@ const homeOf = (unit: BoardUnit) => (unit.bench !== undefined ? benchSpot(unit.b
 export class BoardWorld {
   private renderer: THREE.WebGLRenderer;
   private scene = new THREE.Scene();
+  /** Draws every creature in a few batched draws; see crowd.ts. */
+  private crowd = new Crowd();
   private camera = new THREE.PerspectiveCamera(36, 1, 0.1, 120);
   private eye = new THREE.Vector3();
   private aim = new THREE.Vector3();
@@ -294,6 +297,8 @@ export class BoardWorld {
     this.ring.rotation.x = -Math.PI / 2;
     this.ring.visible = false;
     this.scene.add(this.ring);
+    this.scene.add(this.crowd.root);
+    this.scene.matrixWorldAutoUpdate = false;
 
     this.observer = new ResizeObserver(() => this.resize());
     this.observer.observe(host);
@@ -312,6 +317,7 @@ export class BoardWorld {
     for (const label of this.labels) label.remove();
     this.refund.remove();
     for (const texture of this.badges.values()) texture.dispose();
+    this.crowd.dispose();
     dispose(this.scene);
     this.renderer.dispose();
     this.renderer.forceContextLoss();
@@ -624,6 +630,7 @@ export class BoardWorld {
   private add(unit: BoardUnit): Actor {
     const creature = buildCreature(unit.fighter);
     creature.root.traverse((child) => (child.userData.actor = unit.id));
+    this.crowd.add(creature);
     const bar = new THREE.Group();
     const back = new THREE.Mesh(new THREE.PlaneGeometry(0.9, 0.12), new THREE.MeshBasicMaterial({ color: 0x05070a, depthTest: false, transparent: true, opacity: 0.85 }));
     const fill = new THREE.Mesh(new THREE.PlaneGeometry(BAR_WIDTH, 0.07), new THREE.MeshBasicMaterial({ color: unit.side === 0 ? 0x35c450 : 0xe5484d, depthTest: false, transparent: true }));
@@ -692,6 +699,7 @@ export class BoardWorld {
     this.actors.delete(id);
     this.clearAttachments(actor);
     this.scene.remove(actor.creature.root, actor.bar);
+    this.crowd.remove(actor.creature);
     dispose(actor.creature.root);
     dispose(actor.bar);
   }
@@ -1161,6 +1169,9 @@ export class BoardWorld {
     this.tweens = [...kept, ...this.tweens];
 
     this.pose(seconds, held ? 0 : seconds);
+    // The world matrices are worked out once, here, for the crowd and the renderer both.
+    this.scene.updateMatrixWorld();
+    this.crowd.sync();
     this.renderer.render(this.scene, this.camera);
   };
 
@@ -1199,7 +1210,7 @@ export class BoardWorld {
       for (const eye of creature.eyes) eye.scale.y = blink;
       creature.limbs.forEach((limb, i) => (limb.rotation.x = Math.sin(t * 2.3 + i * Math.PI) * 0.16));
       for (const spinner of creature.spinners) spinner.rotation.y = t * 0.9;
-      for (const skin of creature.skins) skin.emissive.setScalar(actor.flash * 0.8);
+      this.crowd.flash(creature, actor.flash * 0.8);
       actor.bar.position.copy(creature.root.position).setY(creature.height * SIZE * base.y + 0.55 + (id === dragging ? 0.45 : 0));
       for (const object of actor.attachments.values()) {
         object.position.copy(creature.root.position);
