@@ -24,7 +24,11 @@ export type CardRepo = {
   avatar: string | null;
   /** The repo's pulse from pulseOf, oldest month first; absent for a one-colour poster. */
   pulse?: number[] | null;
+  /** Facts a matchup compares; only the matchup card asks GitHub for them. */
+  tape?: Tape;
 };
+
+export type Tape = { forks: number; license: string | null; openIssues: number; closedIssues: number; lastRelease: string | null };
 
 // Activity eases toward a full poster instead of stopping dead at a cap: a month of
 // SOFT_CAP fills about 60%, twice that about 85%. A commit counts 1, a merged PR or
@@ -63,6 +67,8 @@ const BODY = "#c5cad0";
 const MUTED = "#8b949e";
 const STAR = "#f5c84b";
 const STAR_OFF = "#30363d";
+const DIM = "#6e7681";
+const RULE = "#1c2127";
 const NO_LANGUAGE = "#3a4049";
 
 // Bold system sans averages a little under 0.6em per character; no font metrics exist here.
@@ -293,6 +299,67 @@ export function listCard(login: string, title: string, count: number, repos: Car
     body += poster(PAD + i * (w + gap), top, w, repo);
   });
   return card(top + w * 1.5 + 46, `${title}, a list of ${count} repos by ${login}`, body);
+}
+
+function ago(iso: string, now: number): string {
+  const days = Math.floor((now - Date.parse(iso)) / 86_400_000);
+  if (days < 1) return "today";
+  if (days < 60) return `${days} ${days === 1 ? "day" : "days"} ago`;
+  if (days < 730) return `${Math.floor(days / 30)} months ago`;
+  return `${Math.floor(days / 365)} years ago`;
+}
+
+type TapeRow = { label: string; a: string; b: string; lead: "a" | "b" | null };
+
+/** Which side a row's higher number favours; a tie, or a side with nothing to show, favours no one. */
+function leader(a: number | null, b: number | null): "a" | "b" | null {
+  if (a === b) return null;
+  if (b === null) return "a";
+  if (a === null) return "b";
+  return a > b ? "a" : "b";
+}
+
+export function tapeRows(a: CardRepo, b: CardRepo, now: number): TapeRow[] {
+  const ta = a.tape, tb = b.tape;
+  const closed = (t?: Tape) => (t && t.openIssues + t.closedIssues > 0 ? t.closedIssues / (t.openIssues + t.closedIssues) : null);
+  const released = (t?: Tape) => (t?.lastRelease ? Date.parse(t.lastRelease) : null);
+  const [ca, cb] = [closed(ta), closed(tb)];
+  const [ra, rb] = [released(ta), released(tb)];
+  const pct = (v: number | null) => (v === null ? "no issues" : `${Math.round(v * 100)}%`);
+  const built = (r: CardRepo) => `${r.language ?? "No language"} · ${r.tape?.license ?? "no license"}`;
+  return [
+    { label: "Stars", a: compact(a.stars), b: compact(b.stars), lead: leader(a.stars, b.stars) },
+    { label: "Forks", a: compact(ta?.forks ?? 0), b: compact(tb?.forks ?? 0), lead: leader(ta?.forks ?? 0, tb?.forks ?? 0) },
+    // A share rounded to the same percent is a tie on the card, so it is one in the lead too.
+    { label: "Issues closed", a: pct(ca), b: pct(cb), lead: leader(ca === null ? null : Math.round(ca * 100), cb === null ? null : Math.round(cb * 100)) },
+    { label: "Last release", a: ta?.lastRelease ? ago(ta.lastRelease, now) : "none", b: tb?.lastRelease ? ago(tb.lastRelease, now) : "none", lead: leader(ra, rb) },
+    { label: "Built with", a: built(a), b: built(b), lead: null },
+  ];
+}
+
+/**
+ * Two repos head to head: each one's poster at its edge and a tale of the tape between
+ * them. In each row the side that leads is bright and the other dim. There is no
+ * overall winner; the reader weighs the rows.
+ */
+export function matchupCard(topic: string, a: CardRepo, b: CardRepo, now: number): string {
+  const w = 120;
+  const top = 110;
+  const left = PAD + w + 30;
+  const right = CARD_WIDTH - left;
+  const short = (r: CardRepo) => truncate(r.fullName.split("/")[1] ?? r.fullName, 24);
+  let body = `<text x="${PAD}" y="${PAD + 14}" font-size="12" font-weight="600" letter-spacing="1.8" fill="${MUTED}">${escapeXml(`MATCHUP · ${truncate(topic, 50)}`.toUpperCase())}</text>`;
+  body += `<text x="${PAD}" y="${PAD + 52}" font-size="26" font-weight="800" letter-spacing="-0.5" fill="${TEXT}">${escapeXml(short(a))} <tspan fill="${MUTED}" font-weight="700">vs</tspan> ${escapeXml(short(b))}</text>`;
+  body += poster(PAD, top, w, a) + poster(CARD_WIDTH - PAD - w, top, w, b);
+  tapeRows(a, b, now).forEach((row, i) => {
+    const y = top + 26 + i * 36;
+    const cell = (text: string, x: number, anchor: string, leads: boolean) =>
+      `<text x="${x}" y="${y}" text-anchor="${anchor}" font-size="16" font-weight="${leads ? 700 : 400}" fill="${leads ? TEXT : DIM}">${escapeXml(truncate(text, 24))}</text>`;
+    if (i > 0) body += `<line x1="${left}" y1="${y - 24}" x2="${right}" y2="${y - 24}" stroke="${RULE}"/>`;
+    body += cell(row.a, left, "start", row.lead === "a") + cell(row.b, right, "end", row.lead === "b");
+    body += `<text x="${CARD_WIDTH / 2}" y="${y - 1}" text-anchor="middle" font-size="12" font-weight="600" letter-spacing="1.4" fill="${MUTED}">${escapeXml(row.label.toUpperCase())}</text>`;
+  });
+  return card(top + w * 1.5 + 56, `${topic}: ${a.fullName} vs ${b.fullName}`, body);
 }
 
 export type TrainerFacts = { level: number; since: number | null; followers: number; ownStars: number };

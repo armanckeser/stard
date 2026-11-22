@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { CARD_WIDTH, listCard, messageCard, nameLines, pulseOf, reviewCard, runPreviewCard, savedTeamCard, topFourCard, wrap, type CardRepo, type ShareCard, type ShelfPlayer } from "./cards.ts";
+import { CARD_WIDTH, listCard, matchupCard, messageCard, tapeRows, nameLines, pulseOf, reviewCard, runPreviewCard, savedTeamCard, topFourCard, wrap, type CardRepo, type ShareCard, type ShelfPlayer } from "./cards.ts";
 import { fighterFor, type RepoFacts } from "./battle.ts";
 import { defaultCharacter } from "./character.ts";
 import { creatureRecipe } from "./creature-recipe.ts";
@@ -63,6 +63,33 @@ describe("pulseOf", () => {
 
   test("an archived repo is flat whatever its history", () => {
     expect(pulseOf([90, 90, 90], 3, true)).toEqual([0, 0, 0]);
+  });
+});
+
+describe("a matchup", () => {
+  const tape = (extra: Partial<NonNullable<CardRepo["tape"]>> = {}) => ({ forks: 100, license: "MIT", openIssues: 10, closedIssues: 90, lastRelease: "2026-11-01T00:00:00Z", ...extra });
+
+  test("each row leads with the bigger number, the fresher release, and nobody on a tie", () => {
+    const a = repo("a/handy", { stars: 39_700, tape: tape({ forks: 3754, openIssues: 58, closedIssues: 813, lastRelease: "2026-11-02T00:00:00Z" }) });
+    const b = repo("b/whispr", { stars: 12_000, tape: tape({ forks: 1597, openIssues: 271, closedIssues: 899, lastRelease: "2026-11-05T00:00:00Z" }) });
+    const rows = tapeRows(a, b, NOW);
+    expect(rows.map((r) => r.lead)).toEqual(["a", "a", "a", "b", null]);
+    expect(rows[2]).toMatchObject({ a: "93%", b: "77%" });
+    expect(rows[3]).toMatchObject({ a: "8 days ago", b: "5 days ago" });
+    expect(tapeRows(a, repo("c/same", { stars: 39_700, tape: tape() }), NOW)[0].lead).toBeNull();
+  });
+
+  test("a repo with no release or issues loses those rows instead of breaking them", () => {
+    const rows = tapeRows(repo("a/new", { tape: tape({ lastRelease: null, openIssues: 0, closedIssues: 0 }) }), repo("b/old", { tape: tape() }), NOW);
+    expect(rows[2]).toMatchObject({ a: "no issues", lead: "b" });
+    expect(rows[3]).toMatchObject({ a: "none", lead: "b" });
+  });
+
+  test("the card brightens only the leading side and escapes the topic", () => {
+    const svg = matchupCard("<dictation>", repo("a/handy", { stars: 2, tape: tape() }), repo("b/whispr", { stars: 1, tape: tape() }), NOW);
+    expect(svg).toContain("MATCHUP · &lt;DICTATION&gt;");
+    expect(svg).toContain('font-weight="700" fill="#f2f0eb">2</text>');
+    expect(svg).toContain('font-weight="400" fill="#6e7681">1</text>');
   });
 });
 

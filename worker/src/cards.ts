@@ -1,4 +1,4 @@
-import { listCard, messageCard, pulseOf, reviewCard, topFourCard, type CardRepo } from "../../server/cards.ts";
+import { listCard, matchupCard, messageCard, pulseOf, reviewCard, topFourCard, type CardRepo } from "../../server/cards.ts";
 import { askGitHub } from "./github-budget.ts";
 
 // The SVGs a profile README embeds (server/cards.ts draws them):
@@ -6,6 +6,7 @@ import { askGitHub } from "./github-budget.ts";
 //   /api/card/top4.svg?user=<login>&repos=<owner/name,...>&ratings=<5,4.5,...>
 //   /api/card/review.svg?user=<login>&repo=<owner/name>&rating=<4.5>&text=<what they wrote>
 //   /api/card/list.svg?user=<login>&title=<name>&count=<n>&repos=<owner/name,...>
+//   /api/card/matchup.svg?a=<owner/name>&b=<owner/name>&title=<what they both do>
 //
 // Everything a card shows is in its address, so nothing is stored here. GitHub
 // fetches each card through its image proxy and keeps its own copy for a while.
@@ -29,7 +30,16 @@ type RepoNode = {
   merged?: { nodes: { mergedAt: string | null }[] };
   closed?: { nodes: { closedAt: string | null }[] };
   shipped?: { nodes: { publishedAt: string | null }[] };
+  forkCount?: number;
+  licenseInfo?: { spdxId: string | null } | null;
+  openIssues?: { totalCount: number };
+  closedIssues?: { totalCount: number };
+  latestRelease?: { publishedAt: string | null } | null;
 };
+
+// What a matchup compares, asked for only when drawing one.
+const TAPE_FIELDS =
+  " forkCount licenseInfo { spdxId } openIssues: issues(states: OPEN) { totalCount } closedIssues: issues(states: CLOSED) { totalCount } latestRelease { publishedAt }";
 
 // The pulse covers a year in 30-day windows that end now, so the last one is never
 // a half-finished calendar month.
@@ -90,9 +100,9 @@ export async function avatarData(url: string): Promise<string | null> {
 // One fixed-shape query for the named repos. The names were checked against REPO, so
 // this never becomes a general GraphQL proxy on the owner's token. A repo that is
 // gone or private comes back null and is left off the card.
-async function fetchRepos(token: string, names: string[]): Promise<CardRepo[]> {
+async function fetchRepos(token: string, names: string[], withTape = false): Promise<CardRepo[]> {
   const now = Date.now();
-  const fields = `nameWithOwner stargazerCount primaryLanguage { name color } owner { avatarUrl(size: 96) }${pulseFields(now)}`;
+  const fields = `nameWithOwner stargazerCount primaryLanguage { name color } owner { avatarUrl(size: 96) }${pulseFields(now)}${withTape ? TAPE_FIELDS : ""}`;
   const query = `query {${names
     .map((name, i) => {
       const [owner, repo] = name.split("/");
@@ -111,6 +121,16 @@ async function fetchRepos(token: string, names: string[]): Promise<CardRepo[]> {
       color: node.primaryLanguage?.color ?? null,
       avatar: await avatarData(node.owner.avatarUrl),
       pulse: pulseFromNode(node, now),
+      ...(withTape && {
+        tape: {
+          forks: node.forkCount ?? 0,
+          // GitHub calls an unrecognised licence NOASSERTION; the card says "other".
+          license: node.licenseInfo?.spdxId === "NOASSERTION" ? "other" : (node.licenseInfo?.spdxId ?? null),
+          openIssues: node.openIssues?.totalCount ?? 0,
+          closedIssues: node.closedIssues?.totalCount ?? 0,
+          lastRelease: node.latestRelease?.publishedAt ?? null,
+        },
+      }),
     })),
   );
 }
@@ -137,6 +157,7 @@ function parseRating(value: string | null | undefined): number | null {
 }
 
 export async function cardResponse(kind: string, params: URLSearchParams, token: string): Promise<Response> {
+  if (kind === "matchup") return matchupResponse(params, token);
   const login = params.get("user") ?? "";
   if (!LOGIN.test(login)) return svg(messageCard("This card needs a GitHub username."), 400, CACHE_SECONDS);
   const names = (params.get("repos") ?? params.get("repo") ?? "")
@@ -163,6 +184,22 @@ export async function cardResponse(kind: string, params: URLSearchParams, token:
     }
     const count = Math.max(Number.parseInt(params.get("count") ?? "", 10) || 0, repos.length);
     return svg(listCard(login, (params.get("title") ?? "").slice(0, 80) || "A list", count, repos), 200, CACHE_SECONDS);
+  } catch (error) {
+    console.error(error);
+    return svg(messageCard("GitHub didn't answer. This card will be back shortly."), 502, 0);
+  }
+}
+
+// A matchup names two repos and what they both do; it is nobody's card, so it takes no user.
+async function matchupResponse(params: URLSearchParams, token: string): Promise<Response> {
+  const names = [params.get("a") ?? "", params.get("b") ?? ""];
+  if (!names.every((name) => REPO.test(name)) || names[0].toLowerCase() === names[1].toLowerCase()) {
+    return svg(messageCard("A matchup needs two different repos, as a=owner/name and b=owner/name."), 400, CACHE_SECONDS);
+  }
+  try {
+    const repos = await fetchRepos(token, names, true);
+    if (repos.length < 2) return svg(messageCard("One of this matchup's repos could not be found on GitHub."), 404, CACHE_SECONDS);
+    return svg(matchupCard((params.get("title") ?? "").slice(0, 60) || "Head to head", repos[0], repos[1], Date.now()), 200, CACHE_SECONDS);
   } catch (error) {
     console.error(error);
     return svg(messageCard("GitHub didn't answer. This card will be back shortly."), 502, 0);
