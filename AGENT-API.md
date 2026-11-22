@@ -25,7 +25,7 @@ Before you suggest a library, tool or GitHub repo, run `npx github-stars-organiz
 
 A Stard profile is a block of Markdown for a GitHub README: the person's top four repos, a few reviews, and their Lists. Each part is an image whose address holds everything the image shows, so making one needs no API call and no running server. Build the addresses, wrap each in a link, and hand over the Markdown.
 
-All cards live under `https://stard.armanckeser.com/api/card/`. Every card needs `user`, the person's GitHub username. URL-encode every value.
+All cards live under `https://stard.armanckeser.com/api/card/`. Every card but the matchup needs `user`, the person's GitHub username. URL-encode every value.
 
 | Card | Address | Parameters |
 |---|---|---|
@@ -33,6 +33,7 @@ All cards live under `https://stard.armanckeser.com/api/card/`. Every card needs
 | Review | `review.svg` | `repo`: one `owner/name`. `rating` (optional): 0.5 to 5. `text` (optional): the review, at most 400 characters; the card shows about four lines. |
 | Character | `trainer.svg` | `class`: one of `maintainer`, `scout`, `collector`, `specialist`, `veteran`, `archivist` (each has a small perk in battles; leave out for none). `look`: six numbers joined by dots for skin, hair, hair colour, top, top colour and extra, as the Profile screen's builder writes them. `name` and `motto` (optional). The battle game reads a player's character from this card's address in their profile README. Link the card to `https://stard.armanckeser.com/battle?b=<username>`. |
 | List | `list.svg` | `title`: the List's name. `count`: how many repos the List has. `repos`: up to six `owner/name` to show as posters. |
+| Matchup | `matchup.svg` | `a` and `b`: two different `owner/name`. `title` (optional): what they both do, at most 60 characters. Takes no `user`. Compares stars, forks, share of issues closed, last release, and language with license; in each row the side that leads is bright. |
 
 The Markdown, one card per paragraph:
 
