@@ -26,23 +26,29 @@ export type CardRepo = {
   pulse?: number[] | null;
 };
 
-// A month with this much activity fills the poster with colour: a commit counts 1,
-// a merged PR or closed issue 2, a release 5. Busier months are still full.
-const BUSY_MONTH = 60;
+// Activity eases toward a full poster instead of stopping dead at a cap: a month of
+// SOFT_CAP fills about 60%, twice that about 85%. A commit counts 1, a merged PR or
+// closed issue 2, a release 5. The line never quite reaches the top of its band.
+const SOFT_CAP = 30;
+const MOST = 0.92;
+// A month with less than this (a stray closed issue) counts as quiet.
+const QUIET = 5;
 
 /**
- * Monthly activity, oldest first, as the poster's line: 0 is quiet, 1 is busy. Each
- * month is averaged with the two before it so one big launch month doesn't read as
- * a death afterwards. Only the months the repo has existed are drawn, so a new repo
- * spans the poster instead of looking dead and revived. An archived repo is flat.
+ * Monthly activity, oldest first, as the poster's line: 0 is quiet, near 1 is busy.
+ * Each month is averaged with the two before it so one big launch month doesn't read
+ * as a death afterwards. A repo younger than the window draws only the months it has
+ * lived, starting from 0 on the day it was made. An archived repo is flat.
  */
 export function pulseOf(activity: number[], monthsAlive: number, archived: boolean): number[] {
-  const lived = activity.slice(-Math.max(2, Math.min(activity.length, monthsAlive)));
-  return lived.map((_, i) => {
+  const young = monthsAlive < activity.length;
+  const lived = activity.slice(-Math.max(1, Math.min(activity.length, monthsAlive))).map((v) => (v < QUIET ? 0 : v));
+  const line = lived.map((_, i) => {
     if (archived) return 0;
     const recent = lived.slice(Math.max(0, i - 2), i + 1);
-    return Math.min(1, Math.sqrt(recent.reduce((a, b) => a + b, 0) / recent.length / BUSY_MONTH));
+    return MOST * (1 - Math.exp(-recent.reduce((a, b) => a + b, 0) / recent.length / SOFT_CAP));
   });
+  return young ? [0, ...line] : line;
 }
 
 export const CARD_WIDTH = 880;

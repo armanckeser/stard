@@ -43,12 +43,22 @@ describe("pulseOf", () => {
   test("a launch month doesn't make the months after it read as dead", () => {
     // witr's real year: 483 in its launch month, then 15 to 90 a month.
     const pulse = pulseOf([267, 483, 58, 78, 2, 50, 84, 51, 18, 3, 91, 14], 12, false);
-    expect(Math.min(...pulse)).toBeGreaterThan(0.5);
+    expect(Math.min(...pulse)).toBeGreaterThan(0.4);
   });
 
-  test("a repo younger than a year draws only the months it has lived", () => {
-    expect(pulseOf([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 20, 41], 2, false)).toHaveLength(2);
-    expect(pulseOf([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 41], 1, false)).toHaveLength(2);
+  test("a repo younger than a year rises from 0 at its start through only the months it has lived", () => {
+    const pulse = pulseOf([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 20, 41], 2, false);
+    expect(pulse).toHaveLength(3);
+    expect(pulse[0]).toBe(0);
+    expect(pulse[2]).toBeGreaterThan(pulse[1]);
+  });
+
+  test("a stray closed issue doesn't lift a dead repo off the floor", () => {
+    expect(pulseOf([0, 2, 4, 0, 3, 0], 6, false)).toEqual([0, 0, 0, 0, 0, 0]);
+  });
+
+  test("even the busiest repo stays under the top of the line's band", () => {
+    expect(Math.max(...pulseOf([10_000, 12_000, 16_000], 3, false))).toBeLessThan(1);
   });
 
   test("an archived repo is flat whatever its history", () => {
