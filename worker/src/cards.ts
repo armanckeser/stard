@@ -1,4 +1,4 @@
-import { listCard, messageCard, reviewCard, topFourCard, type CardRepo } from "../../server/cards.ts";
+import { listCard, messageCard, pulseOf, reviewCard, topFourCard, type CardRepo } from "../../server/cards.ts";
 import { askGitHub } from "./github-budget.ts";
 
 // The SVGs a profile README embeds (server/cards.ts draws them):
@@ -23,7 +23,50 @@ type RepoNode = {
   stargazerCount: number;
   primaryLanguage: { name: string; color: string | null } | null;
   owner: { avatarUrl: string };
+  createdAt?: string;
+  isArchived?: boolean;
+  defaultBranchRef?: { target?: Record<string, { totalCount: number } | undefined> } | null;
+  merged?: { nodes: { mergedAt: string | null }[] };
+  closed?: { nodes: { closedAt: string | null }[] };
+  shipped?: { nodes: { publishedAt: string | null }[] };
 };
+
+// The pulse covers a year in 30-day windows that end now, so the last one is never
+// a half-finished calendar month.
+const WINDOWS = 12;
+const WINDOW_MS = 30 * 86_400_000;
+
+function pulseFields(now: number): string {
+  const history = Array.from({ length: WINDOWS }, (_, i) => {
+    const since = new Date(now - (WINDOWS - i) * WINDOW_MS).toISOString();
+    const until = new Date(now - (WINDOWS - 1 - i) * WINDOW_MS).toISOString();
+    return `c${i}: history(since: "${since}", until: "${until}") { totalCount }`;
+  });
+  // The latest 100 merged PRs and closed issues: a repo busy enough to have more in a
+  // year is full colour from its commits alone.
+  return (
+    ` createdAt isArchived defaultBranchRef { target { ... on Commit { ${history.join(" ")} } } }` +
+    " merged: pullRequests(states: MERGED, first: 100, orderBy: { field: UPDATED_AT, direction: DESC }) { nodes { mergedAt } }" +
+    " closed: issues(states: CLOSED, first: 100, orderBy: { field: UPDATED_AT, direction: DESC }) { nodes { closedAt } }" +
+    " shipped: releases(first: 20, orderBy: { field: CREATED_AT, direction: DESC }) { nodes { publishedAt } }"
+  );
+}
+
+/** The repo's pulse, or null when GitHub left out its commit history (an empty repo). */
+export function pulseFromNode(node: RepoNode, now: number): number[] | null {
+  const target = node.defaultBranchRef?.target;
+  if (!target?.c0 || !node.createdAt) return null;
+  const activity = Array.from({ length: WINDOWS }, (_, i) => target[`c${i}`]?.totalCount ?? 0);
+  const add = (at: string | null, weight: number) => {
+    const i = WINDOWS - 1 - Math.floor((now - Date.parse(at ?? "")) / WINDOW_MS);
+    if (i >= 0 && i < WINDOWS) activity[i] += weight;
+  };
+  node.merged?.nodes.forEach((n) => add(n.mergedAt, 2));
+  node.closed?.nodes.forEach((n) => add(n.closedAt, 2));
+  node.shipped?.nodes.forEach((n) => add(n.publishedAt, 5));
+  const monthsAlive = Math.ceil((now - Date.parse(node.createdAt)) / WINDOW_MS);
+  return pulseOf(activity, monthsAlive, node.isArchived ?? false);
+}
 
 // btoa wants a binary string; building one in chunks keeps a large avatar off the call stack.
 function base64(bytes: Uint8Array): string {
@@ -48,7 +91,8 @@ export async function avatarData(url: string): Promise<string | null> {
 // this never becomes a general GraphQL proxy on the owner's token. A repo that is
 // gone or private comes back null and is left off the card.
 async function fetchRepos(token: string, names: string[]): Promise<CardRepo[]> {
-  const fields = "nameWithOwner stargazerCount primaryLanguage { name color } owner { avatarUrl(size: 96) }";
+  const now = Date.now();
+  const fields = `nameWithOwner stargazerCount primaryLanguage { name color } owner { avatarUrl(size: 96) }${pulseFields(now)}`;
   const query = `query {${names
     .map((name, i) => {
       const [owner, repo] = name.split("/");
@@ -66,6 +110,7 @@ async function fetchRepos(token: string, names: string[]): Promise<CardRepo[]> {
       language: node.primaryLanguage?.name ?? null,
       color: node.primaryLanguage?.color ?? null,
       avatar: await avatarData(node.owner.avatarUrl),
+      pulse: pulseFromNode(node, now),
     })),
   );
 }
