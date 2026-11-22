@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { CARD_WIDTH, listCard, messageCard, nameLines, reviewCard, runPreviewCard, savedTeamCard, topFourCard, wrap, type CardRepo, type ShareCard, type ShelfPlayer } from "./cards.ts";
+import { CARD_WIDTH, listCard, messageCard, nameLines, pulseOf, reviewCard, runPreviewCard, savedTeamCard, topFourCard, wrap, type CardRepo, type ShareCard, type ShelfPlayer } from "./cards.ts";
 import { fighterFor, type RepoFacts } from "./battle.ts";
 import { defaultCharacter } from "./character.ts";
 import { creatureRecipe } from "./creature-recipe.ts";
@@ -36,6 +36,23 @@ describe("wrap", () => {
   test("wraps at the width and ends a cut-off text with an ellipsis", () => {
     expect(wrap("one two three four five six", 9, 2)).toEqual(["one two", "three…"]);
     expect(wrap("short", 20, 3)).toEqual(["short"]);
+  });
+});
+
+describe("pulseOf", () => {
+  test("a launch month doesn't make the months after it read as dead", () => {
+    // witr's real year: 483 in its launch month, then 15 to 90 a month.
+    const pulse = pulseOf([267, 483, 58, 78, 2, 50, 84, 51, 18, 3, 91, 14], 12, false);
+    expect(Math.min(...pulse)).toBeGreaterThan(0.5);
+  });
+
+  test("a repo younger than a year draws only the months it has lived", () => {
+    expect(pulseOf([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 20, 41], 2, false)).toHaveLength(2);
+    expect(pulseOf([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 41], 1, false)).toHaveLength(2);
+  });
+
+  test("an archived repo is flat whatever its history", () => {
+    expect(pulseOf([90, 90, 90], 3, true)).toEqual([0, 0, 0]);
   });
 });
 
@@ -84,6 +101,14 @@ describe("the cards", () => {
     expect(svg).toContain("A list by octo · 28 repos");
     expect(svg).toContain(">r5</text>");
     expect(svg).not.toContain(">r6</text>");
+  });
+
+  test("a poster with a pulse splits into grey and colour, with the star count in grey's ink", () => {
+    const svg = reviewCard("octo", repo("a/light", { color: "#f1e05a", pulse: [1, 0.5, 0] }), 4, "");
+    expect(svg).toMatch(/<path d="M[^"]+Z" fill="#f1e05a"\/>/);
+    expect(svg).toContain('fill="#ffffff" fill-opacity="0.8">★');
+    expect(svg).toContain('fill="#14171a">light</text>');
+    expect(reviewCard("octo", repo("a/flat"), 4, "")).not.toContain("<path");
   });
 
   test("a card that can't be drawn says why", () => {

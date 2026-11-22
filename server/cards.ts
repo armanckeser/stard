@@ -22,7 +22,28 @@ export type CardRepo = {
   color: string | null;
   /** The owner's avatar as a data: URI, or null to leave the avatar out. */
   avatar: string | null;
+  /** The repo's pulse from pulseOf, oldest month first; absent for a one-colour poster. */
+  pulse?: number[] | null;
 };
+
+// A month with this much activity fills the poster with colour: a commit counts 1,
+// a merged PR or closed issue 2, a release 5. Busier months are still full.
+const BUSY_MONTH = 60;
+
+/**
+ * Monthly activity, oldest first, as the poster's line: 0 is quiet, 1 is busy. Each
+ * month is averaged with the two before it so one big launch month doesn't read as
+ * a death afterwards. Only the months the repo has existed are drawn, so a new repo
+ * spans the poster instead of looking dead and revived. An archived repo is flat.
+ */
+export function pulseOf(activity: number[], monthsAlive: number, archived: boolean): number[] {
+  const lived = activity.slice(-Math.max(2, Math.min(activity.length, monthsAlive)));
+  return lived.map((_, i) => {
+    if (archived) return 0;
+    const recent = lived.slice(Math.max(0, i - 2), i + 1);
+    return Math.min(1, Math.sqrt(recent.reduce((a, b) => a + b, 0) / recent.length / BUSY_MONTH));
+  });
+}
 
 export const CARD_WIDTH = 880;
 const PAD = 30;
@@ -116,6 +137,30 @@ function ratingStars(x: number, y: number, size: number, rating: number): string
   return out;
 }
 
+/**
+ * A poster split by a smooth line through the pulse: the repo's colour below it, grey
+ * above, so a repo winding down drains to grey. The line stays between `top` (under
+ * the avatar) and `bottom` (over the owner), so the name always sits on colour.
+ */
+function pulseFill(x: number, y: number, w: number, h: number, top: number, bottom: number, color: string, pulse: number[]): string {
+  const f = (n: number) => n.toFixed(1);
+  const inBand = (v: number) => Math.min(bottom, Math.max(top, v));
+  const pts = pulse.map((v, i) => [x + (i * w) / (pulse.length - 1), bottom - (bottom - top) * v] as const);
+  // Catmull-Rom through the points, as cubic Béziers whose handles stay in the band.
+  let d = `M${f(pts[0][0])},${f(pts[0][1])}`;
+  for (let i = 0; i < pts.length - 1; i++) {
+    const [p0, p1, p2, p3] = [pts[i - 1] ?? pts[i], pts[i], pts[i + 1], pts[i + 2] ?? pts[i + 1]];
+    d += ` C${f(p1[0] + (p2[0] - p0[0]) / 6)},${f(inBand(p1[1] + (p2[1] - p0[1]) / 6))} ${f(p2[0] - (p3[0] - p1[0]) / 6)},${f(inBand(p2[1] - (p3[1] - p1[1]) / 6))} ${f(p2[0])},${f(p2[1])}`;
+  }
+  const clip = `pl${clipCount++}`;
+  return (
+    `<clipPath id="${clip}"><rect x="${x}" y="${y}" width="${w}" height="${h}" rx="6"/></clipPath><g clip-path="url(#${clip})">` +
+    `<rect x="${x}" y="${y}" width="${w}" height="${h}" fill="${NO_LANGUAGE}"/>` +
+    `<path d="${d} L${x + w},${y + h} L${x},${y + h} Z" fill="${color}"/>` +
+    `<path d="${d}" fill="none" stroke="#ffffff" stroke-opacity="0.85" stroke-width="${f(Math.max(w * 0.012, 1))}"/></g>`
+  );
+}
+
 function poster(x: number, y: number, w: number, repo: CardRepo): string {
   const h = w * 1.5;
   const m = w * 0.09;
@@ -130,14 +175,20 @@ function poster(x: number, y: number, w: number, repo: CardRepo): string {
   const nameTop = y + h - m - lineHeight * (lines.length - 1);
   const avatar = w * 0.24;
   const clip = `av${clipCount++}`;
+  const ownerY = nameTop - lineHeight * 0.95;
+  const pulse = repo.pulse && repo.pulse.length >= 2 ? repo.pulse : null;
+  // With a pulse the star count sits above the line, on grey, so it takes grey's ink.
+  const topInk = pulse ? inkOn(NO_LANGUAGE) : ink;
 
-  let out = `<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="6" fill="${color}"/>`;
+  let out = pulse
+    ? pulseFill(x, y, w, h, y + m + avatar, ownerY - small * 1.4, color, pulse)
+    : `<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="6" fill="${color}"/>`;
   if (repo.avatar) {
     out += `<clipPath id="${clip}"><rect x="${x + m}" y="${y + m}" width="${avatar}" height="${avatar}" rx="${avatar * 0.18}"/></clipPath>`;
     out += `<image href="${escapeXml(repo.avatar)}" x="${x + m}" y="${y + m}" width="${avatar}" height="${avatar}" clip-path="url(#${clip})" preserveAspectRatio="xMidYMid slice"/>`;
   }
-  out += `<text x="${x + w - m}" y="${y + m + small}" text-anchor="end" font-size="${small}" font-weight="600" fill="${ink}" fill-opacity="0.8">★ ${compact(repo.stars)}</text>`;
-  out += `<text x="${x + m}" y="${nameTop - lineHeight * 0.95}" font-size="${small}" font-weight="600" fill="${ink}" fill-opacity="0.75">${escapeXml(truncate(owner ?? "", 22))}</text>`;
+  out += `<text x="${x + w - m}" y="${y + m + small}" text-anchor="end" font-size="${small}" font-weight="600" fill="${topInk}" fill-opacity="0.8">★ ${compact(repo.stars)}</text>`;
+  out += `<text x="${x + m}" y="${ownerY}" font-size="${small}" font-weight="600" fill="${ink}" fill-opacity="0.75">${escapeXml(truncate(owner ?? "", 22))}</text>`;
   lines.forEach((line, i) => {
     out += `<text x="${x + m}" y="${nameTop + i * lineHeight}" font-size="${size.toFixed(1)}" font-weight="800" letter-spacing="${(-size * 0.02).toFixed(2)}" fill="${ink}">${escapeXml(line)}</text>`;
   });
