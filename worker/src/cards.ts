@@ -11,7 +11,7 @@ import { askGitHub } from "./github-budget.ts";
 // Everything a card shows is in its address, so nothing is stored here. GitHub
 // fetches each card through its image proxy and keeps its own copy for a while.
 
-export const CARD_PATH = /^\/api\/card\/(top4|review|list)\.svg$/;
+export const CARD_PATH = /^\/api\/card\/(top4|review|list|matchup)\.svg$/;
 
 export const LOGIN = /^[a-z\d](?:[a-z\d]|-(?=[a-z\d])){0,38}$/i;
 export const REPO = /^[\w.-]{1,39}\/[\w.-]{1,100}$/;
