@@ -105,7 +105,7 @@ export async function gql<T>(token: string, query: string): Promise<T> {
   return json.data;
 }
 
-function toFacts(node: FactsNode): RepoFacts {
+export function toFacts(node: FactsNode): RepoFacts {
   return {
     fullName: node.nameWithOwner,
     description: node.description,
@@ -164,7 +164,7 @@ export async function readFacts(token: string, names: string[]): Promise<FactsNo
 export const FACTS_KEPT_FOR = 7 * 24 * 3600 * 1000;
 
 /** The facts of `names`, in their order: those kept in `store` under a day old, the rest read from GitHub and kept. */
-async function factsFor(token: string, names: string[], now: number, store?: FactsStore): Promise<FactsNode[]> {
+export async function factsFor(token: string, names: string[], now: number, store?: FactsStore): Promise<FactsNode[]> {
   const known = new Map<string, FactsNode>();
   const kept = store ? await store.read(names).catch((error) => (console.error(error), [] as KeptFacts[])) : [];
   for (const { node, readAt } of kept) if (now - readAt < FACTS_KEPT_FOR) known.set(node.nameWithOwner.toLowerCase(), node);

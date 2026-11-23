@@ -14,6 +14,7 @@ import { RUN_PICTURE_PATH, RUN_SHARE_PATH, SHARE_PATH, VERSUS_PATH, runPictureRe
 import { TEAM_PAGE_PATH, TEAM_PATH, teamPage, teamResponse } from "./team.ts";
 import { TEAM_PICTURE_PATH, teamPictureResponse } from "./team-picture.ts";
 import { d1FactsStore } from "./repo-facts.ts";
+import { repoPages } from "./repo-page.ts";
 import { d1TeamLinks } from "./team-links.ts";
 
 // BATTLE_KEY signs the teams in a battle's opening post (worker/src/game.ts), a run's token (worker/src/run.ts)
@@ -112,7 +113,12 @@ export default {
     if (SHARE_PATH.test(url.pathname)) return request.method === "GET" ? sharePage(request, url) : fetch(request);
     if (RUN_SHARE_PATH.test(url.pathname)) return request.method === "GET" ? runSharePage(request, url) : fetch(request);
     if (TEAM_PAGE_PATH.test(url.pathname)) return request.method === "GET" ? teamPage(request, url, env.BATTLE_KEY, optOuts, count, links) : fetch(request);
-    // The /run* and /team* routes also catch pages such as /runs; those belong to the site.
+    if (url.pathname.startsWith("/repo") && request.method === "GET") {
+      const facts = env.DB ? d1FactsStore(env.DB) : undefined;
+      const repoPage = await repoPages(url, { cache: caches.default, now: Date.now(), waitUntil: (work) => context.waitUntil(work), token: env.GITHUB_TOKEN, facts });
+      if (repoPage) return repoPage;
+    }
+    // The /run*, /team* and /repo* routes also catch pages such as /runs; those belong to the site.
     if (!url.pathname.startsWith("/api/")) return fetch(request);
     if (EVENT_ROUTE.test(url.pathname)) return eventResponse(request, count);
     const now = Date.now();

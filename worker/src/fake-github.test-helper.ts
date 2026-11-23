@@ -41,6 +41,9 @@ const REPOS: Record<string, Repo> = {
   ...POPULAR_REPOS,
 };
 
+/** Repos that moved, by their old name: GitHub answers the old name with the repo under its new one. */
+export const MOVED: Record<string, string> = { "greendale/old-dreamatorium": "greendale/dreamatorium" };
+
 type Account = { readme: string | null; pinned: string[]; stars: string[]; characterFile?: string; noPlay?: true };
 
 export const HOST = "study-group-abed";
@@ -175,10 +178,13 @@ export async function fakeGitHub(input: RequestInfo | URL, init?: RequestInit): 
   if (list) return Response.json({ data: { node: listNode(list[1]) } });
   const data: Record<string, unknown> = {};
   for (const found of query.matchAll(/(b\d+): search\(query: "([^"]+)", type: REPOSITORY, first: (\d+)\)/g)) {
-    data[found[1]] = { nodes: foundBy(found[2]).slice(0, Number(found[3])).map((nameWithOwner) => ({ nameWithOwner })) };
+    data[found[1]] = { nodes: foundBy(found[2]).slice(0, Number(found[3])).map((nameWithOwner) => ({ nameWithOwner, stargazerCount: REPOS[nameWithOwner].stars })) };
   }
   for (const found of query.matchAll(/(r\d+): repository\(owner: "([^"]+)", name: "([^"]+)"\)/g)) {
-    data[found[1]] = REPOS[`${found[2]}/${found[3]}`] ? repoNode(`${found[2]}/${found[3]}`) : null;
+    // GitHub finds a repo whatever the case of its name, and answers with the name as it is.
+    const asked = `${found[2]}/${found[3]}`.toLowerCase();
+    const name = Object.keys(REPOS).find((key) => key.toLowerCase() === (MOVED[asked] ?? asked));
+    data[found[1]] = name ? repoNode(name) : null;
   }
   return Response.json({ data });
 }
