@@ -653,3 +653,13 @@ export function savedTeamCard(player: ShelfPlayer, wins: number, losses: number,
   const record = recordOf(wins, losses);
   return sharePicture(`${player.login}'s team: ${record}`, font, nameplate(player) + headline(record, false) + shelf(player));
 }
+
+/** One card on its own, as the shop draws it, for a repo's page (worker/src/repo-page.ts). */
+export function cardPicture(card: ShareCard, font: string): string {
+  const [w, h] = [240, 360];
+  return (
+    `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}" role="img" aria-label="${escapeXml(`${card.name} as a Stard card`)}" font-family="${escapeXml(font)}" font-weight="700">` +
+    shelfCard(0, 0, w, h, card, "art") +
+    `</svg>`
+  );
+}
