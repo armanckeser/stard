@@ -49,7 +49,7 @@ async function sideOf(team: Team): Promise<VersusSide> {
   };
 }
 
-function image(bytes: Uint8Array, status: number, cacheSeconds: number): Response {
+export function image(bytes: Uint8Array, status: number, cacheSeconds: number): Response {
   return new Response(bytes, {
     status,
     headers: {

@@ -207,6 +207,11 @@ export function fakeGitHubWhere(options: { noPlay: readonly string[] }): FakeGit
     if (init?.body === undefined) return fakeGitHub(_input, init);
     const { query } = JSON.parse(String(init?.body)) as { query: string };
     const user = /user\(login: "([^"]+)"\)/.exec(query);
+    // Wrapped's read: a page of stars with when each was given.
+    if (user && query.includes("pageInfo")) {
+      usersRead.push(user[1].toLowerCase());
+      return starsPage(query);
+    }
     if (user) {
       usersRead.push(user[1].toLowerCase());
       const account = ACCOUNTS[user[1]] ?? STAND_IN;
@@ -228,6 +233,47 @@ function accountNode(account: Account) {
     pinnedItems: { nodes: account.pinned.map(repoNode) },
     starredRepositories: { nodes: account.stars.map((nameWithOwner) => ({ nameWithOwner, isPrivate: false })) },
   };
+}
+
+/** No such account: a Wrapped read of it finds no user. */
+export const NOBODY = "study-group-nobody";
+/** Starred 1,293 made-up repos in 2026, more than Wrapped reads, and a few in 2025. */
+export const STARGAZER = "study-group-chang";
+
+type StarredEdge = { starredAt: string; node: Record<string, unknown> };
+
+/** Someone's stars with when they were given, newest first, as Wrapped reads them. */
+function starredEdges(login: string): StarredEdge[] {
+  if (login === STARGAZER) {
+    // One every 6 hours back from Nov 20, 2026: 1,293 land in 2026, the rest in 2025.
+    return Array.from({ length: 1300 }, (_, i) => ({
+      starredAt: new Date(Date.parse("2026-11-20T00:00:00Z") - i * 6 * 3600_000).toISOString(),
+      node: { nameWithOwner: `chang-dynasty/star-${i}`, isPrivate: false, stargazerCount: 10 + i, createdAt: "2020-01-01T00:00:00Z", pushedAt: "2026-11-01T00:00:00Z", isArchived: false, primaryLanguage: { name: "Python", color: "#3572A5" } },
+    }));
+  }
+  const account = ACCOUNTS[login] ?? STAND_IN;
+  // The account's stars a month apart, the newest in October 2026.
+  return account.stars.map((fullName, i) => {
+    const node = repoNode(fullName in REPOS ? fullName : "greendale/human-being");
+    return { starredAt: new Date(Date.UTC(2026, 9 - i, 15)).toISOString(), node: { ...node, nameWithOwner: fullName, isPrivate: false } };
+  });
+}
+
+/** One page of 100 of someone's stars, after the cursor (the index of the last one read). */
+function starsPage(query: string): Response {
+  const login = /user\(login: "([^"]+)"\)/.exec(query)![1];
+  if (login === NOBODY) return Response.json({ data: { user: null }, errors: [{ type: "NOT_FOUND", message: `Could not resolve to a User with the login of '${login}'.` }] });
+  const after = Number(/after: "(\d+)"/.exec(query)?.[1] ?? -1);
+  const edges = starredEdges(login);
+  const page = edges.slice(after + 1, after + 101);
+  return Response.json({
+    data: {
+      user: {
+        login, avatarUrl: `https://avatars.example/${login}`,
+        starredRepositories: { pageInfo: { hasNextPage: after + 101 < edges.length, endCursor: String(after + page.length) }, edges: page },
+      },
+    },
+  });
 }
 
 /** A `fetch` for when GitHub can't be reached at all. */

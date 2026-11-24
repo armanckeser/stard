@@ -13,6 +13,7 @@ import { setName } from "./run/names.ts";
 import { recordOf } from "./run/saved-team.ts";
 import { markOf } from "./run/set-glyph.ts";
 import { tierColor } from "./run/tiers.ts";
+import { MONTHS, WRAPPED_YEAR, alivePercent, countText, summaryLine, type WrappedStats } from "./wrapped.ts";
 
 export type CardRepo = {
   fullName: string;
@@ -662,4 +663,113 @@ export function cardPicture(card: ShareCard, font: string): string {
     shelfCard(0, 0, w, h, card, "art") +
     `</svg>`
   );
+}
+
+/** The system fonts the README cards use, after the font the Worker draws PNGs with. */
+export const WRAPPED_FONTS = `'Space Grotesk',${FONT}`;
+
+/** The frame of a Wrapped card: the README cards' colours at the size link previews ask for. */
+function wrappedFrame(label: string, font: string, body: string, footer: string): string {
+  return (
+    `<svg xmlns="http://www.w3.org/2000/svg" width="${SHARE_WIDTH}" height="${SHARE_HEIGHT}" viewBox="0 0 ${SHARE_WIDTH} ${SHARE_HEIGHT}" role="img" aria-label="${escapeXml(label)}" font-family="${escapeXml(font)}" font-weight="700">` +
+    `<title>${escapeXml(label)}</title>` +
+    `<rect x="1" y="1" width="${SHARE_WIDTH - 2}" height="${SHARE_HEIGHT - 2}" rx="16" fill="${BG}" stroke="${EDGE}" stroke-width="2"/>` +
+    body +
+    `<line x1="${MARGIN}" y1="566" x2="${SHARE_WIDTH - MARGIN}" y2="566" stroke="${EDGE}"/>` +
+    `<text x="${MARGIN}" y="600" font-size="18" font-weight="600" fill="${MUTED}">${escapeXml(footer)}</text>` +
+    `<text x="${SHARE_WIDTH - MARGIN}" y="600" text-anchor="end" font-size="18" font-weight="600" fill="${MUTED}">github.com/armanckeser/stard</text>` +
+    `</svg>`
+  );
+}
+
+/** A Wrapped card's block label, small capitals. */
+function blockLabel(text: string, x: number, y: number, fill = MUTED): string {
+  return `<text x="${x}" y="${y}" font-size="16" font-weight="700" letter-spacing="2" fill="${fill}">${escapeXml(text.toUpperCase())}</text>`;
+}
+
+/** The person's avatar and login, and which year this is, in the top left; the mark in the top right. */
+function wrappedHeader(login: string, avatar: string | null, year: number, soFar: boolean): string {
+  let out = `<circle cx="${MARGIN + 34}" cy="96" r="34" fill="${NO_LANGUAGE}"/>`;
+  if (avatar) out += `<clipPath id="wface"><circle cx="${MARGIN + 34}" cy="96" r="34"/></clipPath><image href="${escapeXml(avatar)}" x="${MARGIN}" y="62" width="68" height="68" clip-path="url(#wface)" preserveAspectRatio="xMidYMid slice"/>`;
+  const size = Math.min(40, Math.floor(620 / (Math.max(login.length, 8) * BOLD_CHAR)));
+  out += `<text x="${MARGIN + 88}" y="92" font-size="${size}" letter-spacing="-0.8" fill="${TEXT}">${escapeXml(login)}</text>`;
+  out += blockLabel(`${year} in GitHub stars${soFar ? " · so far" : ""}`, MARGIN + 90, 124, STAR);
+  out += `<polygon points="${star(SHARE_WIDTH - MARGIN - 92, 88, 11)}" fill="${STAR}"/>`;
+  out += `<text x="${SHARE_WIDTH - MARGIN}" y="98" text-anchor="end" font-size="30" letter-spacing="-0.4" fill="${TEXT}">stard</text>`;
+  return out;
+}
+
+/**
+ * Someone's year in GitHub stars, at 1200×630 so one drawing serves a README (as SVG)
+ * and a link preview (as PNG, worker/src/wrapped.ts): how many repos they starred, the
+ * months they starred them in, their top languages, their earliest find and how many
+ * of the year's stars are still alive. `font` is WRAPPED_FONTS for the SVG, or the one
+ * font the Worker draws PNGs with.
+ */
+export function wrappedCard(login: string, avatar: string | null, stats: WrappedStats, font: string): string {
+  const shown = countText(stats);
+  let body = wrappedHeader(login, avatar, stats.year, stats.soFar);
+
+  // The count, as large as fits the left half.
+  const countSize = Math.min(168, Math.floor(470 / (shown.length * 0.62)));
+  body += `<text x="${MARGIN - 4}" y="318" font-size="${countSize}" letter-spacing="${(-countSize * 0.04).toFixed(1)}" fill="${TEXT}">${escapeXml(shown)}</text>`;
+  body += `<text x="${MARGIN}" y="364" font-size="28" fill="${BODY}">${stats.count === 1 ? "repo" : "repos"} starred in ${stats.year}</text>`;
+  if (stats.capped) body += `<text x="${MARGIN}" y="396" font-size="18" font-weight="600" fill="${MUTED}">Counted from the latest ${stats.count.toLocaleString("en-US")}</text>`;
+
+  // A bar per month, the busiest in gold.
+  const chartLeft = 600;
+  const step = (SHARE_WIDTH - MARGIN - chartLeft) / 12;
+  const barWidth = step - 12;
+  const base = 370;
+  const tallest = 150;
+  const most = Math.max(1, ...stats.months);
+  body += blockLabel(stats.busiest === null ? "Stars by month" : `Busiest · ${MONTHS[stats.busiest]} · ${stats.months[stats.busiest]}`, chartLeft + 6, 192, stats.busiest === null ? MUTED : TEXT);
+  stats.months.forEach((n, i) => {
+    const x = chartLeft + i * step + 6;
+    const h = n > 0 ? Math.max(6, (n / most) * tallest) : 3;
+    const busiest = i === stats.busiest;
+    body += `<rect x="${x.toFixed(1)}" y="${(base - h).toFixed(1)}" width="${barWidth.toFixed(1)}" height="${h.toFixed(1)}" rx="3" fill="${busiest ? STAR : n > 0 ? "#4b5563" : STAR_OFF}"/>`;
+    body += `<text x="${(x + barWidth / 2).toFixed(1)}" y="${base + 28}" text-anchor="middle" font-size="16" font-weight="600" fill="${busiest ? STAR : MUTED}">${MONTHS[i][0]}</text>`;
+  });
+
+  // Three facts along the bottom.
+  const columns = [MARGIN, 456, 840];
+  const top = 456;
+  body += `<line x1="${MARGIN}" y1="${top - 36}" x2="${SHARE_WIDTH - MARGIN}" y2="${top - 36}" stroke="${EDGE}"/>`;
+  const none = (x: number, text: string) => `<text x="${x}" y="${top + 40}" font-size="24" fill="${DIM}">${text}</text>`;
+
+  body += blockLabel("Top languages", columns[0], top);
+  if (stats.languages.length === 0) body += none(columns[0], "None yet");
+  stats.languages.forEach((language, i) => {
+    const y = top + 36 + i * 31;
+    const color = language.color && /^#[0-9a-f]{6}$/i.test(language.color) ? language.color : NO_LANGUAGE;
+    body += `<circle cx="${columns[0] + 7}" cy="${y - 7}" r="7" fill="${color}"/>`;
+    body += `<text x="${columns[0] + 24}" y="${y}" font-size="24" fill="${TEXT}">${escapeXml(truncate(language.name, 16))} <tspan fill="${MUTED}" font-size="20">${language.count}</tspan></text>`;
+  });
+
+  body += blockLabel("Early find", columns[1], top);
+  if (stats.earlyFind) {
+    const find = stats.earlyFind;
+    const name = find.fullName.split("/")[1] ?? find.fullName;
+    body += `<text x="${columns[1]}" y="${top + 40}" font-size="28" letter-spacing="-0.4" fill="${TEXT}">${escapeXml(truncate(name, 20))}</text>`;
+    const age = find.daysOld === 0 ? "on its first day" : `at ${find.daysOld} ${find.daysOld === 1 ? "day" : "days"} old`;
+    body += `<text x="${columns[1]}" y="${top + 72}" font-size="20" font-weight="600" fill="${BODY}">starred ${age}, now <tspan fill="${STAR}">${compact(find.stars)} stars</tspan></text>`;
+  } else body += none(columns[1], stats.count === 0 ? "None yet" : "None this year");
+
+  body += blockLabel("Still alive", columns[2], top);
+  const percent = alivePercent(stats);
+  if (percent === null) body += none(columns[2], "None yet");
+  else {
+    body += `<text x="${columns[2]}" y="${top + 44}" font-size="42" letter-spacing="-1" fill="${TEXT}">${percent}%</text>`;
+    body += `<text x="${columns[2]}" y="${top + 72}" font-size="20" font-weight="600" fill="${BODY}">pushed to in the last 90 days</text>`;
+  }
+
+  const label = `${login}'s ${stats.year} in GitHub stars: ${summaryLine(stats)}`;
+  return wrappedFrame(label, font, body, `stard.armanckeser.com/wrapped/${login}`);
+}
+
+/** In place of a Wrapped card that can't be drawn yet (GitHub is busy, or there is no such user), at the same size. */
+export function wrappedNoteCard(login: string, note: string, soFar: boolean, font: string): string {
+  const lines = wrap(note, 40, 3).map((line, i) => `<text x="${MARGIN}" y="${300 + i * 54}" font-size="40" letter-spacing="-0.6" fill="${BODY}">${escapeXml(line)}</text>`);
+  return wrappedFrame(note, font, wrappedHeader(login, null, WRAPPED_YEAR, soFar) + lines.join(""), "stard.armanckeser.com/wrapped");
 }

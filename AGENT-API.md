@@ -34,6 +34,7 @@ All cards live under `https://stard.armanckeser.com/api/card/`. Every card but t
 | Character | `trainer.svg` | `class`: one of `maintainer`, `scout`, `collector`, `specialist`, `veteran`, `archivist` (each has a small perk in battles; leave out for none). `look`: six numbers joined by dots for skin, hair, hair colour, top, top colour and extra, as the Profile screen's builder writes them. `name` and `motto` (optional). The battle game reads a player's character from this card's address in their profile README. Link the card to `https://stard.armanckeser.com/battle?b=<username>`. |
 | List | `list.svg` | `title`: the List's name. `count`: how many repos the List has. `repos`: up to six `owner/name` to show as posters. |
 | Matchup | `matchup.svg` | `a` and `b`: two different `owner/name`. `title` (optional): what they both do, at most 60 characters. Takes no `user`. Compares stars, forks, share of issues closed, last release, and language with license; in each row the side that leads is bright. |
+| Wrapped | `wrapped.svg` | Only `user`. The person's 2026 in public stars: how many, by month, top languages, earliest find, share still alive. Unlike the others it reads GitHub, once a day. At 1200×630; `wrapped.png` is the same card for link previews. Link it to `https://stard.armanckeser.com/wrapped/<username>`, the page to share it from. |
 
 The Markdown, one card per paragraph:
 
