@@ -16,6 +16,7 @@ import { TEAM_PICTURE_PATH, teamPictureResponse } from "./team-picture.ts";
 import { d1FactsStore } from "./repo-facts.ts";
 import { repoPages } from "./repo-page.ts";
 import { d1TeamLinks } from "./team-links.ts";
+import { WRAPPED_CARD_PATH, wrappedCardResponse, wrappedPage, type WrappedDeps } from "./wrapped.ts";
 
 // BATTLE_KEY signs the teams in a battle's opening post (worker/src/game.ts), a run's token (worker/src/run.ts)
 // and a finished run's team (worker/src/team.ts):
@@ -36,6 +37,16 @@ const LOGIN = /^[a-z\d](?:[a-z\d]|-(?=[a-z\d])){0,38}$/i;
 const CACHE_SECONDS = 3600;
 
 const MOVED_PERMANENTLY = 301;
+
+// A shared List's page, /list/<id>. The static host has no page for each id and answers
+// with its fallback page and a 404; the page is the app, so the Worker makes it a 200.
+const LIST_PAGE_PATH = /^\/list\/[^/]+\/?$/;
+
+async function appShell(request: Request): Promise<Response> {
+  const page = await fetch(request);
+  if (!(page.headers.get("Content-Type") ?? "").includes("text/html")) return page;
+  return new Response(page.body, { status: 200, headers: new Headers(page.headers) });
+}
 
 type GraphQLResponse<T> = { data?: T; errors?: { type?: string; message: string }[] };
 
@@ -118,7 +129,13 @@ export default {
       const repoPage = await repoPages(url, { cache: caches.default, now: Date.now(), waitUntil: (work) => context.waitUntil(work), token: env.GITHUB_TOKEN, facts });
       if (repoPage) return repoPage;
     }
-    // The /run*, /team* and /repo* routes also catch pages such as /runs; those belong to the site.
+    if (LIST_PAGE_PATH.test(url.pathname)) return request.method === "GET" ? appShell(request) : fetch(request);
+    const wrappedDeps = (): WrappedDeps => ({ cache: caches.default, now: Date.now(), waitUntil: (work) => context.waitUntil(work), token: env.GITHUB_TOKEN, blocked });
+    if (url.pathname.startsWith("/wrapped") && request.method === "GET") {
+      const page = await wrappedPage(url, wrappedDeps());
+      if (page) return page;
+    }
+    // The /run*, /team*, /repo* and /wrapped* routes also catch pages such as /runs; those belong to the site.
     if (!url.pathname.startsWith("/api/")) return fetch(request);
     if (EVENT_ROUTE.test(url.pathname)) return eventResponse(request, count);
     const now = Date.now();
@@ -149,6 +166,9 @@ export default {
     // A match changes with every comment, so its replies set their own short cache and skip this one.
     const match = GAME_PATH.exec(url.pathname);
     if (match) return gameResponse(match[1], url.searchParams, env.GITHUB_TOKEN, env.BATTLE_KEY);
+
+    const wrapped = WRAPPED_CARD_PATH.exec(url.pathname);
+    if (wrapped) return wrappedCardResponse(wrapped[1], url, wrappedDeps());
 
     if (TEAM_PICTURE_PATH.test(url.pathname)) return teamPictureResponse(url, env.BATTLE_KEY, optOuts, (work) => context.waitUntil(work), links);
 

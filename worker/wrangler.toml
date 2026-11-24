@@ -17,6 +17,10 @@ routes = [
   { pattern = "stard.armanckeser.com/team*", zone_name = "armanckeser.com" },
   # A page per repo for people searching a repo's stars, and their sitemap (src/repo-page.ts).
   { pattern = "stard.armanckeser.com/repo*", zone_name = "armanckeser.com" },
+  # "Your 2026 in stars": a page per username with its card (src/wrapped.ts).
+  { pattern = "stard.armanckeser.com/wrapped*", zone_name = "armanckeser.com" },
+  # A shared List's page: the app, answered with a 200 where the static host says 404 (src/index.ts).
+  { pattern = "stard.armanckeser.com/list/*", zone_name = "armanckeser.com" },
   # The game's first address, kept for the cards in profile READMEs and links already
   # shared: the Worker serves its /api/* and redirects the rest (server/site.ts).
   { pattern = "stars-demo.armanckeser.com/*", zone_name = "armanckeser.com" },

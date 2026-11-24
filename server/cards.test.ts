@@ -1,8 +1,9 @@
 import { describe, expect, test } from "vitest";
-import { CARD_WIDTH, listCard, matchupCard, messageCard, tapeRows, nameLines, pulseOf, reviewCard, runPreviewCard, savedTeamCard, topFourCard, wrap, type CardRepo, type ShareCard, type ShelfPlayer } from "./cards.ts";
+import { CARD_WIDTH, listCard, matchupCard, messageCard, tapeRows, nameLines, pulseOf, reviewCard, runPreviewCard, savedTeamCard, topFourCard, wrap, wrappedCard, WRAPPED_FONTS, type CardRepo, type ShareCard, type ShelfPlayer } from "./cards.ts";
 import { fighterFor, type RepoFacts } from "./battle.ts";
 import { defaultCharacter } from "./character.ts";
 import { creatureRecipe } from "./creature-recipe.ts";
+import { wrappedStats } from "./wrapped.ts";
 
 const NOW = Date.parse("2026-11-10T00:00:00Z");
 
@@ -254,5 +255,39 @@ describe("a saved team's share picture", () => {
     const svg = savedTeamCard(player([card("dreamatorium", 3)]), 3, 3, "Space Grotesk");
     expect(svg).not.toContain("Rookie");
     expect(svg).toContain('stroke="#4a90d9" stroke-width="2"');
+  });
+});
+
+describe("wrappedCard", () => {
+  const stats = wrappedStats(
+    [
+      { starredAt: "2026-03-10T00:00:00Z", node: { nameWithOwner: "greendale/dreamatorium", stargazerCount: 41_200, createdAt: "2026-03-01T00:00:00Z", pushedAt: "2026-11-01T00:00:00Z", isArchived: false, primaryLanguage: { name: "Rust", color: "#dea584" } } },
+      { starredAt: "2026-03-12T00:00:00Z", node: { nameWithOwner: "greendale/<script>", stargazerCount: 10, createdAt: "2019-01-01T00:00:00Z", pushedAt: null, isArchived: true, primaryLanguage: null } },
+    ],
+    NOW,
+  );
+
+  test("shows the count, the busiest month, the early find and the share still alive, at link-preview size", () => {
+    const svg = wrappedCard("abed", null, stats, WRAPPED_FONTS);
+    expect(svg).toContain('width="1200" height="630"');
+    expect(svg).toContain(">2</text>");
+    expect(svg).toContain("BUSIEST · MARCH · 2");
+    expect(svg).toContain("dreamatorium");
+    expect(svg).toContain("starred at 9 days old");
+    expect(svg).toContain(">50%</text>");
+    expect(svg).toContain("github.com/armanckeser/stard");
+  });
+
+  test("a year with no stars draws an empty chart and says none yet", () => {
+    const svg = wrappedCard("pierce", null, wrappedStats([], NOW), WRAPPED_FONTS);
+    expect(svg).toContain(">0</text>");
+    expect(svg).toContain("None yet");
+    expect(svg).toContain("STARS BY MONTH");
+  });
+
+  test("a capped year reads 1,000+ and says what it counted", () => {
+    const svg = wrappedCard("chang", null, { ...stats, count: 1000, capped: true }, WRAPPED_FONTS);
+    expect(svg).toContain(">1,000+</text>");
+    expect(svg).toContain("Counted from the latest 1,000");
   });
 });
