@@ -53,6 +53,9 @@ jobs:
       # Pages has no SPA fallback; serving index.html as the 404 page gives deep
       # links like /explore a route to land on.
       - run: cp dist/index.html dist/404.html
+      # That fallback answers with a 404, which link checkers read as a dead link; a
+      # page per fixed route (compose.html, ...) answers /compose with a 200.
+      - run: node scripts/app-pages.mjs dist
       - uses: actions/upload-pages-artifact@v3
         with:
           path: dist
