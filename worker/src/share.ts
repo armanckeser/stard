@@ -5,7 +5,8 @@ import { CLASSES, type Character } from "../../server/character.ts";
 import { creatureRecipe } from "../../server/creature-recipe.ts";
 import { priceOf, type RunFighter } from "../../server/run/rules.ts";
 import { setsOf } from "../../server/run/sets.ts";
-import { NoSuchUser, evened, teamFor, withRunCards, type Team } from "./battle.ts";
+import { battle, instantSeed } from "../../server/battle.ts";
+import { NoSuchUser, battleDay, battleSides, evened, teamFor, withRunCards, type Team } from "./battle.ts";
 import { LOGIN, avatarData } from "./cards.ts";
 import font from "./SpaceGrotesk-Bold.ttf";
 
@@ -15,8 +16,8 @@ import font from "./SpaceGrotesk-Bold.ttf";
 // in the address. The picture they point at is drawn here too: link previews don't
 // take SVG, so the card is turned into a PNG.
 //
-//   /battle?a=<login>&b=<login>[&play=1]      the app's page, with this battle's tags
-//   /api/card/versus.png?a=<login>&b=<login>  the picture
+//   /battle?a=<login>&b=<login>[&d=<day>][&play=1]      the app's page, with this battle's tags
+//   /api/card/versus.png?a=<login>&b=<login>[&d=<day>]  the picture; with a day, the winner too
 
 export const VERSUS_PATH = /^\/api\/card\/versus\.png$/;
 export const SHARE_PATH = /^\/battle\/?$/;
@@ -61,15 +62,21 @@ export function image(bytes: Uint8Array, status: number, cacheSeconds: number): 
   });
 }
 
+// With `d`, the battle link names its day, so the fight is settled and the picture shows the winner.
 export async function versusResponse(params: URLSearchParams, token: string): Promise<Response> {
   const loginA = params.get("a") ?? "";
   const loginB = params.get("b") ?? "";
   if (!LOGIN.test(loginA) || !LOGIN.test(loginB)) return new Response("A battle needs two GitHub usernames.", { status: 400 });
+  const pinned = params.get("d");
+  const day = battleDay(pinned, Date.now());
+  if (!day) return new Response("A battle's date reads like 2026-11-26 and can't be later than today.", { status: 400 });
   try {
-    const now = Date.now();
-    const [a, b] = evened(...(await Promise.all([teamFor(token, loginA, now), teamFor(token, loginB, now)])));
+    const { sides, drawAt } = await battleSides(token, loginA, loginB, day);
+    const [a, b] = evened(...sides);
     const [left, right] = await Promise.all([sideOf(a), sideOf(b)]);
-    return image(await png(versusCard(left, right, FONT_FAMILY)), 200, CACHE_SECONDS);
+    const { winner, standing } = battle(a.team, b.team, instantSeed(a, b, drawAt));
+    const result = pinned && winner ? { winner, left: standing[winner] } : undefined;
+    return image(await png(versusCard(left, right, FONT_FAMILY, result)), 200, CACHE_SECONDS);
   } catch (error) {
     if (error instanceof NoSuchUser) return new Response(`No GitHub user called ${error.message}.`, { status: 404 });
     console.error(error);
@@ -89,9 +96,12 @@ export async function sharePage(request: Request, url: URL): Promise<Response> {
   const headers = new Headers(page.headers);
   if (!LOGIN.test(a) || !LOGIN.test(b)) return new Response(page.body, { status: 200, headers });
 
-  const query = `a=${encodeURIComponent(a)}&b=${encodeURIComponent(b)}`;
+  // A day the picture would refuse is left out, so the preview still shows the two teams.
+  const given = url.searchParams.get("d");
+  const d = given && battleDay(given, Date.now()) === given ? given : null;
+  const query = `a=${encodeURIComponent(a)}&b=${encodeURIComponent(b)}${d ? `&d=${encodeURIComponent(d)}` : ""}`;
   const title = `${a} vs ${b} · Stard battle`;
-  const says = `${a}'s GitHub repos against ${b}'s, as cards. Watch the battle or start your own.`;
+  const says = d ? `${a}'s GitHub repos against ${b}'s, as cards. See who won, then pick your own matchup.` : `${a}'s GitHub repos against ${b}'s, as cards. Watch the battle or start your own.`;
   const picture = `${url.origin}/api/card/versus.png?${query}`;
   const tags = [
     ["property", "og:type", "website"],
@@ -102,7 +112,7 @@ export async function sharePage(request: Request, url: URL): Promise<Response> {
     ["property", "og:image", picture],
     ["property", "og:image:width", "1200"],
     ["property", "og:image:height", "630"],
-    ["property", "og:image:alt", `${a} and ${b}, each with a team of repo cards, facing each other`],
+    ["property", "og:image:alt", d ? `${a} and ${b}, each with a team of repo cards, and the winner of the battle marked in gold` : `${a} and ${b}, each with a team of repo cards, facing each other`],
     ["name", "twitter:card", "summary_large_image"],
     ["name", "twitter:title", title],
     ["name", "twitter:description", says],
