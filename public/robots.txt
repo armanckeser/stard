@@ -1,4 +1,4 @@
 User-agent: *
 Allow: /
 
-Sitemap: https://stard.armanckeser.com/repo/sitemap.xml
+Sitemap: https://stard.armanckeser.com/sitemap.xml
