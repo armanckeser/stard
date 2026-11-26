@@ -99,6 +99,9 @@ function repoNode(fullName: string) {
   };
 }
 
+/** An account's stars as the team read gets them: a month apart, the newest in October 2026. */
+const starEdges = (stars: string[]) => stars.map((nameWithOwner, i) => ({ starredAt: new Date(Date.UTC(2026, 9 - i, 15)).toISOString(), node: { nameWithOwner, isPrivate: false } }));
+
 function userNode(login: string) {
   const account = ACCOUNTS[login];
   if (!account) return null;
@@ -111,7 +114,7 @@ function userNode(login: string) {
       : { readme: { text: account.readme }, character: account.characterFile === undefined ? null : { text: account.characterFile }, noPlay: account.noPlay ? { oid: "d3a9e1" } : null },
     pinnedItems: { nodes: account.pinned.map(repoNode) },
     repositories: { nodes: [] },
-    starredRepositories: { nodes: account.stars.map((nameWithOwner) => ({ nameWithOwner, isPrivate: false })) },
+    starredRepositories: { edges: starEdges(account.stars) },
     lists: { nodes: (LISTS[login] ?? []).map(({ slug, isPrivate }) => ({ id: listId(login, slug), slug, name: slug.replace(/-/g, " "), isPrivate })) },
   };
 }
@@ -231,7 +234,7 @@ function accountNode(account: Account) {
     stard: account.readme === null ? null : { readme: { text: account.readme } },
     lists: { nodes: [] },
     pinnedItems: { nodes: account.pinned.map(repoNode) },
-    starredRepositories: { nodes: account.stars.map((nameWithOwner) => ({ nameWithOwner, isPrivate: false })) },
+    starredRepositories: { edges: starEdges(account.stars) },
   };
 }
 

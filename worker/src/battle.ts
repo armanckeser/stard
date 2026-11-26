@@ -17,8 +17,9 @@ import { supporterMark, supporters } from "./supporters.ts";
 //   /api/battle?a=<login>&b=<login>[&d=<day>]            both teams and every hit, as JSON
 //   /api/card/battle.svg?a=<login>&b=<login>[&d=<day>]   how the fight ended, as a card
 //
-// A battle is drawn for one UTC day: today, or the day `d` names (YYYY-MM-DD), so a
-// shared link shows the same winner after midnight.
+// A battle is drawn for one UTC day: today, or the day `d` names (YYYY-MM-DD), from the
+// stars given by the end of that day, so a shared link keeps its fight after midnight.
+// The repos' numbers are still read fresh, so a big change to a repo can still move it.
 //
 // Nothing a player sends is trusted: the only inputs are two usernames.
 
@@ -221,7 +222,7 @@ export async function teamFor(token: string, login: string, now: number, size = 
       stard: { readme: { text?: string } | null; character?: { text?: string } | null; noPlay?: { oid: string } | null } | null;
       pinnedItems: { nodes: ({ nameWithOwner: string } | Record<string, never>)[] };
       repositories: { nodes: { nameWithOwner: string }[] };
-      starredRepositories: { nodes: { nameWithOwner: string; isPrivate: boolean }[] };
+      starredRepositories: { edges: { starredAt: string; node: { nameWithOwner: string; isPrivate: boolean } }[] };
       lists: { nodes: Deck[] };
     }) | null;
   }>(
@@ -238,7 +239,7 @@ export async function teamFor(token: string, login: string, now: number, size = 
       }
       pinnedItems(first: ${TEAM_SIZE}, types: REPOSITORY) { nodes { ... on Repository { nameWithOwner } } }
       repositories(first: ${TEAM_SIZE}, ownerAffiliations: OWNER, isFork: false, privacy: PUBLIC, orderBy: { field: STARGAZERS, direction: DESC }) { nodes { nameWithOwner } }
-      starredRepositories(first: 100, orderBy: { field: STARRED_AT, direction: DESC }) { nodes { nameWithOwner isPrivate } }
+      starredRepositories(first: 100, orderBy: { field: STARRED_AT, direction: DESC }) { edges { starredAt node { nameWithOwner isPrivate } } }
       lists(first: 100) { nodes { id slug name isPrivate } }
     }
     here: repository(owner: ${JSON.stringify(SELF_REPO.owner)}, name: ${JSON.stringify(SELF_REPO.name)}) {
@@ -279,9 +280,10 @@ export async function teamFor(token: string, login: string, now: number, size = 
   const pickedAce = choice.ace ? aces.find((name) => name.toLowerCase() === choice.ace!.toLowerCase()) : undefined;
   if (pickedAce) chosen = [pickedAce, ...chosen.filter((name) => name !== pickedAce)];
   const ace = chosen.slice(0, 1);
-  const stars = user.starredRepositories.nodes.filter((repo) => !repo.isPrivate).map((repo) => repo.nameWithOwner);
-  if (ace.length === 0 && stars.length > 0) source = "stars";
   const day = new Date(drawAt).toISOString().slice(0, 10);
+  // Stars given after the day are left out, so a link to an earlier battle keeps its cards when the player stars more.
+  const stars = user.starredRepositories.edges.filter(({ starredAt, node }) => !node.isPrivate && starredAt.slice(0, 10) <= day).map(({ node }) => node.nameWithOwner);
+  if (ace.length === 0 && stars.length > 0) source = "stars";
   // The deck's repos are starred too, so the stars draw skips all of them: the deck fills its share and no more.
   const deck = choice.deck;
   const inDeck = deck ? await deckRepos(token, user, deck) : [];

@@ -74,8 +74,8 @@ export async function versusResponse(params: URLSearchParams, token: string): Pr
     const { sides, drawAt } = await battleSides(token, loginA, loginB, day);
     const [a, b] = evened(...sides);
     const [left, right] = await Promise.all([sideOf(a), sideOf(b)]);
-    const { winner, standing } = battle(a.team, b.team, instantSeed(a, b, drawAt));
-    const result = pinned && winner ? { winner, left: standing[winner] } : undefined;
+    const fight = pinned ? battle(a.team, b.team, instantSeed(a, b, drawAt)) : null;
+    const result = fight?.winner ? { winner: fight.winner, left: fight.standing[fight.winner] } : undefined;
     return image(await png(versusCard(left, right, FONT_FAMILY, result)), 200, CACHE_SECONDS);
   } catch (error) {
     if (error instanceof NoSuchUser) return new Response(`No GitHub user called ${error.message}.`, { status: 404 });

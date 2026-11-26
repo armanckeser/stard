@@ -37,6 +37,18 @@ describe("a battle's day", () => {
     expect(later).toEqual(shared);
   });
 
+  // Regression guarded: a player starring more repos after a battle was shared redrawing the shared fight's cards.
+  test("stars given after the day leave the fight alone", async () => {
+    const shared = await fight(NOV_1);
+    vi.stubGlobal("fetch", async (input: RequestInfo | URL, init?: RequestInit) => {
+      const body = (await (await fakeGitHub(input, init)).json()) as { data?: { user?: { starredRepositories?: { edges: unknown[] } } } };
+      body.data?.user?.starredRepositories?.edges.unshift({ starredAt: "2026-11-05T10:00:00Z", node: { nameWithOwner: "greendale/paintball-assassin", isPrivate: false } });
+      return Response.json(body);
+    });
+    expect(await fight(NOV_1 + 9 * DAY_MS, shared.day)).toEqual(shared);
+    expect(await fight(NOV_1 + 9 * DAY_MS)).not.toMatchObject({ a: shared.a });
+  });
+
   test("a link with no day draws for today", async () => {
     const shared = await fight(NOV_1);
     const later = await fight(NOV_1 + 9 * DAY_MS);
