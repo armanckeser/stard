@@ -1,4 +1,4 @@
-import { createFileRoute, redirect } from "@tanstack/react-router";
+import { createFileRoute, redirect, useNavigate, useSearch } from "@tanstack/react-router";
 import { useLiveQuery } from "@tanstack/react-db";
 import { useState, useMemo, useCallback, useEffect } from "react";
 import { z } from "zod";
@@ -39,7 +39,7 @@ import {
   repoSearchFields,
 } from "@/components/repo-table/registry";
 
-const searchSchema = z.object({
+export const searchSchema = z.object({
   sort: z.string().optional(),
   group: z.string().optional(),
   search: z.string().optional(),
@@ -55,8 +55,10 @@ const searchSchema = z.object({
   lists: z.string().optional(),
 });
 
-// The demo's bare address opens on Play, the game the site leads with. Only the first
-// page of a visit: the stars table stays one tap away, and a card's ?user= link still lands here.
+// The demo's bare address opens on Play, the game the site leads with. Only when a visit
+// starts there: the stars table stays one tap away, and a card's ?user= link, /organize or
+// any other page a visit starts on leads to the stars.
+const startedOnHome = DEMO && window.location.pathname === import.meta.env.BASE_URL && window.location.search === "";
 let landed = false;
 
 export const Route = createFileRoute("/")({
@@ -65,7 +67,7 @@ export const Route = createFileRoute("/")({
   beforeLoad: () => {
     const first = !landed;
     landed = true;
-    if (DEMO && first && window.location.search === "") throw redirect({ to: "/run" });
+    if (startedOnHome && first) throw redirect({ to: "/run" });
   },
 });
 
@@ -107,9 +109,10 @@ async function importLocal(setProgress: (text: string) => void) {
   if (health.total > 0) setProgress(`${read} Scored ${health.scored} repos.`);
 }
 
-function AllStarsPage() {
-  const navigate = Route.useNavigate();
-  const searchParams = Route.useSearch();
+/** The stars table, at "/" and at /organize (routes/organize.tsx). */
+export function AllStarsPage() {
+  const navigate = useNavigate();
+  const searchParams = useSearch({ strict: false });
 
   const { data: repos } = useLiveQuery((q) =>
     q.from({ repoCollection }).select(({ repoCollection }) => repoCollection),
@@ -166,7 +169,7 @@ function AllStarsPage() {
         DEFAULT_SORT,
         DEFAULT_GROUP_BY,
       );
-      navigate({ search: params as Record<string, string>, replace: true });
+      navigate({ to: ".", search: params as Record<string, string>, replace: true });
     },
     [navigate, registry],
   );
