@@ -42,7 +42,7 @@ describe("a Wrapped page", () => {
     expect(text).toContain(`<meta property="og:image" content="https://stard.armanckeser.com/api/card/wrapped.png?user=${HOST}">`);
     expect(text).toContain('<meta name="twitter:card" content="summary_large_image">');
     expect(text).toContain("3 repos, mostly JavaScript, peak in August. 33% are still alive");
-    expect(text).toContain(`href="/?user=${HOST}">Now sort these 3 stars into Lists`);
+    expect(text).toContain(`href="/organize?user=${HOST}">Now sort these 3 stars into Lists`);
     expect(text).toContain("https://bsky.app/intent/compose?text=");
     expect(text).toContain("https://x.com/intent/tweet?text=");
     expect(text).toContain(`[![2026 in stars](https://stard.armanckeser.com/api/card/wrapped.svg?user=${HOST})](https://stard.armanckeser.com/wrapped/${HOST})`);
