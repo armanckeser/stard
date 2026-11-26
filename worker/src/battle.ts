@@ -14,8 +14,12 @@ import { supporterMark, supporters } from "./supporters.ts";
 // The instant battle (issue #46): two usernames, each one's team read from GitHub,
 // a fight decided by server/battle.ts.
 //
-//   /api/battle?a=<login>&b=<login>            both teams and every hit, as JSON
-//   /api/card/battle.svg?a=<login>&b=<login>   how the fight ended, as a card
+//   /api/battle?a=<login>&b=<login>[&d=<day>]            both teams and every hit, as JSON
+//   /api/card/battle.svg?a=<login>&b=<login>[&d=<day>]   how the fight ended, as a card
+//
+// A battle is drawn for one UTC day: today, or the day `d` names (YYYY-MM-DD), from the
+// stars given by the end of that day, so a shared link keeps its fight after midnight.
+// The repos' numbers are still read fresh, so a big change to a repo can still move it.
 //
 // Nothing a player sends is trusted: the only inputs are two usernames.
 
@@ -205,7 +209,8 @@ type Deck = DeckChoice & { id: string; isPrivate: boolean };
 // short; `evened` then trims the other side to match. `choice.deck` is one of the
 // player's public Lists by its slug: up to DECK_SHARE of the cards are drawn from it.
 // `choice.ace` leads the team when it is one of the aces on offer; otherwise it is let go.
-export async function teamFor(token: string, login: string, now: number, size = TEAM_SIZE, popular?: () => Promise<PopularList>, kept?: FactsStore, choice: PoolChoice = {}): Promise<Team> {
+// `drawAt` is the moment the draw and the cards' numbers are worked out for; the facts read and kept use `now`.
+export async function teamFor(token: string, login: string, now: number, size = TEAM_SIZE, popular?: () => Promise<PopularList>, kept?: FactsStore, choice: PoolChoice = {}, drawAt = now): Promise<Team> {
   const name = JSON.stringify(login);
   const starred = supporters(token, now);
   const data = await gql<{
@@ -217,7 +222,7 @@ export async function teamFor(token: string, login: string, now: number, size = 
       stard: { readme: { text?: string } | null; character?: { text?: string } | null; noPlay?: { oid: string } | null } | null;
       pinnedItems: { nodes: ({ nameWithOwner: string } | Record<string, never>)[] };
       repositories: { nodes: { nameWithOwner: string }[] };
-      starredRepositories: { nodes: { nameWithOwner: string; isPrivate: boolean }[] };
+      starredRepositories: { edges: { starredAt: string; node: { nameWithOwner: string; isPrivate: boolean } }[] };
       lists: { nodes: Deck[] };
     }) | null;
   }>(
@@ -234,7 +239,7 @@ export async function teamFor(token: string, login: string, now: number, size = 
       }
       pinnedItems(first: ${TEAM_SIZE}, types: REPOSITORY) { nodes { ... on Repository { nameWithOwner } } }
       repositories(first: ${TEAM_SIZE}, ownerAffiliations: OWNER, isFork: false, privacy: PUBLIC, orderBy: { field: STARGAZERS, direction: DESC }) { nodes { nameWithOwner } }
-      starredRepositories(first: 100, orderBy: { field: STARRED_AT, direction: DESC }) { nodes { nameWithOwner isPrivate } }
+      starredRepositories(first: 100, orderBy: { field: STARRED_AT, direction: DESC }) { edges { starredAt node { nameWithOwner isPrivate } } }
       lists(first: 100) { nodes { id slug name isPrivate } }
     }
     here: repository(owner: ${JSON.stringify(SELF_REPO.owner)}, name: ${JSON.stringify(SELF_REPO.name)}) {
@@ -275,9 +280,10 @@ export async function teamFor(token: string, login: string, now: number, size = 
   const pickedAce = choice.ace ? aces.find((name) => name.toLowerCase() === choice.ace!.toLowerCase()) : undefined;
   if (pickedAce) chosen = [pickedAce, ...chosen.filter((name) => name !== pickedAce)];
   const ace = chosen.slice(0, 1);
-  const stars = user.starredRepositories.nodes.filter((repo) => !repo.isPrivate).map((repo) => repo.nameWithOwner);
+  const day = new Date(drawAt).toISOString().slice(0, 10);
+  // Stars given after the day are left out, so a link to an earlier battle keeps its cards when the player stars more.
+  const stars = user.starredRepositories.edges.filter(({ starredAt, node }) => !node.isPrivate && starredAt.slice(0, 10) <= day).map(({ node }) => node.nameWithOwner);
   if (ace.length === 0 && stars.length > 0) source = "stars";
-  const day = new Date(now).toISOString().slice(0, 10);
   // The deck's repos are starred too, so the stars draw skips all of them: the deck fills its share and no more.
   const deck = choice.deck;
   const inDeck = deck ? await deckRepos(token, user, deck) : [];
@@ -306,7 +312,7 @@ export async function teamFor(token: string, login: string, now: number, size = 
     wildcard: i >= aceNodes.length && i < aceNodes.length + drawn.length,
     ...(fromPopular.has(node.nameWithOwner) ? { popular: true } : {}),
   }));
-  const team = fieldTeam(repos, user.login, character.klass, now).map((fighter, i) => (repos[i].wildcard ? { ...fighter, wildcard: true } : repos[i].popular ? { ...fighter, popular: true } : fighter));
+  const team = fieldTeam(repos, user.login, character.klass, drawAt).map((fighter, i) => (repos[i].wildcard ? { ...fighter, wildcard: true } : repos[i].popular ? { ...fighter, popular: true } : fighter));
   const facts: SideFacts = { readAt: new Date(now).toISOString(), character: built, ace: aceNodes[0]?.nameWithOwner ?? null, source, repos };
   const mark = supporterMark(await starred.soFar(), user.login, user.stard?.noPlay ? "left-out" : "in");
   return { login: user.login, avatarUrl: user.avatarUrl, ...mark, source, character, team, facts,
@@ -331,6 +337,27 @@ async function deckRepos(token: string, user: { login: string; lists: { nodes: D
     `query { node(id: ${JSON.stringify(list.id)}) { ... on UserList { items(first: ${DECK_READ}) { nodes { ... on Repository { nameWithOwner isPrivate } } } } } }`,
   );
   return (data.node?.items.nodes ?? []).flatMap((node) => ("nameWithOwner" in node && !node.isPrivate ? [node.nameWithOwner] : []));
+}
+
+const DAY = /^\d{4}-\d{2}-\d{2}$/;
+
+/** The UTC day a battle is drawn for: `d` when given, else today's; null when `d` is not a real day up to today. */
+export function battleDay(d: string | null, now: number): string | null {
+  const today = new Date(now).toISOString().slice(0, 10);
+  if (!d) return today;
+  if (!DAY.test(d) || d > today || Number.isNaN(Date.parse(d)) || new Date(Date.parse(d)).toISOString().slice(0, 10) !== d) return null;
+  return d;
+}
+
+/**
+ * Both sides of an instant battle on `day`, before they are evened. They are drawn as at
+ * the start of that day, so the cards' numbers, and with them the fight, hold all day.
+ */
+export async function battleSides(token: string, loginA: string, loginB: string, day: string): Promise<{ sides: [Team, Team]; drawAt: number }> {
+  const now = Date.now();
+  const drawAt = Date.parse(`${day}T00:00:00Z`);
+  const side = (login: string) => teamFor(token, login, now, TEAM_SIZE, undefined, undefined, {}, drawAt);
+  return { sides: await Promise.all([side(loginA), side(loginB)]), drawAt };
 }
 
 /** Both teams cut to the size of the smaller one, so nobody plays five cards against two. */
@@ -436,16 +463,17 @@ export async function battleResponse(kind: string, params: URLSearchParams, toke
   const loginA = params.get("a") ?? "";
   const loginB = params.get("b") ?? "";
   if (!LOGIN.test(loginA) || !LOGIN.test(loginB)) return fail("A battle needs two GitHub usernames.", 400, CACHE_SECONDS);
+  const day = battleDay(params.get("d"), Date.now());
+  if (!day) return fail("A battle's date reads like 2026-11-26 and can't be later than today.", 400, 0);
 
   try {
-    const now = Date.now();
-    const full = await Promise.all([teamFor(token, loginA, now), teamFor(token, loginB, now)]);
+    const { sides: full, drawAt } = await battleSides(token, loginA, loginB, day);
     const empty = full.find((side) => side.team.length === 0);
     if (empty) return fail(`${empty.login} has no public repos to play with.`, 404, CACHE_SECONDS);
     const [a, b] = evened(...full);
-    const seed = instantSeed(a, b, now);
+    const seed = instantSeed(a, b, drawAt);
     const result = battle(a.team, b.team, seed);
-    if (!asCard) return json({ a, b, seed, result }, 200, CACHE_SECONDS);
+    if (!asCard) return json({ a, b, seed, day, result }, 200, CACHE_SECONDS);
     const [teamA, teamB] = await Promise.all([Promise.all(a.team.map(cardRepo)), Promise.all(b.team.map(cardRepo))]);
     return svg(
       battleCard({ login: a.login, team: teamA, standing: result.standing.a }, { login: b.login, team: teamB, standing: result.standing.b }, result.winner),

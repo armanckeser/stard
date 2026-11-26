@@ -440,12 +440,16 @@ export type VersusSide = {
 const SHARE_WIDTH = 1200;
 const SHARE_HEIGHT = 630;
 
+/** How a battle ended, for the share picture: who won, and how many of their cards were still up. */
+export type VersusResult = { winner: "a" | "b"; left: number };
+
 /**
  * Two players face to face before a battle, at the size link previews ask for. Drawn
  * to be turned into a PNG (worker/src/share.ts), so it names one font, the one the
- * Worker carries, in place of the system fonts the other cards use.
+ * Worker carries, in place of the system fonts the other cards use. With `result`, the
+ * winner's side is marked and the loser's dimmed, so a pasted link shows who won.
  */
-export function versusCard(a: VersusSide, b: VersusSide, font: string): string {
+export function versusCard(a: VersusSide, b: VersusSide, font: string, result?: VersusResult): string {
   const side = (player: VersusSide, right: boolean): string => {
     // Everything is laid out for the left side; the right side mirrors each x.
     const x = (value: number) => (right ? SHARE_WIDTH - value : value);
@@ -478,11 +482,24 @@ export function versusCard(a: VersusSide, b: VersusSide, font: string): string {
     `<line x1="648" y1="0" x2="552" y2="${SHARE_HEIGHT}" stroke="#ffffff" stroke-opacity="0.25" stroke-width="3"/>` +
     side(a, false) +
     side(b, true) +
+    (result ? winnerMarks(result) : "") +
     `<text x="605" y="165" text-anchor="middle" font-size="128" letter-spacing="-5" fill="${STAR}">VS</text>` +
     `<text x="600" y="160" text-anchor="middle" font-size="128" letter-spacing="-5" fill="#ffffff">VS</text>` +
     `<polygon points="${star(566, 596, 9)}" fill="${STAR}"/>` +
     `<text x="582" y="604" font-size="24" letter-spacing="-0.3" fill="${TEXT}">stard</text>` +
     `</svg>`
+  );
+}
+
+// The loser's half under a dark veil, and a gold line over the winner's avatar.
+function winnerMarks({ winner, left }: VersusResult): string {
+  const right = winner === "b";
+  const veil = right ? `0,0 648,0 552,${SHARE_HEIGHT} 0,${SHARE_HEIGHT}` : `648,0 ${SHARE_WIDTH},0 ${SHARE_WIDTH},${SHARE_HEIGHT} 552,${SHARE_HEIGHT}`;
+  const words = `WINNER · ${left} ${left === 1 ? "card" : "cards"} left`;
+  return (
+    `<polygon points="${veil}" fill="#0b0e12" opacity="0.6"/>` +
+    `<polygon points="${star(right ? SHARE_WIDTH - 54 : 54, 34, 15)}" fill="${STAR}"/>` +
+    `<text x="${right ? SHARE_WIDTH - 80 : 80}" y="47" text-anchor="${right ? "end" : "start"}" font-size="36" letter-spacing="-0.5" fill="${STAR}">${words}</text>`
   );
 }
 

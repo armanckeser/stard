@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { CARD_WIDTH, listCard, matchupCard, messageCard, tapeRows, nameLines, pulseOf, reviewCard, runPreviewCard, savedTeamCard, topFourCard, wrap, wrappedCard, WRAPPED_FONTS, type CardRepo, type ShareCard, type ShelfPlayer } from "./cards.ts";
+import { CARD_WIDTH, listCard, matchupCard, messageCard, tapeRows, nameLines, pulseOf, reviewCard, runPreviewCard, savedTeamCard, topFourCard, versusCard, wrap, wrappedCard, WRAPPED_FONTS, type CardRepo, type ShareCard, type ShelfPlayer } from "./cards.ts";
 import { fighterFor, type RepoFacts } from "./battle.ts";
 import { defaultCharacter } from "./character.ts";
 import { creatureRecipe } from "./creature-recipe.ts";
@@ -91,6 +91,17 @@ describe("a matchup", () => {
     expect(svg).toContain("MATCHUP · &lt;DICTATION&gt;");
     expect(svg).toContain('font-weight="700" fill="#f2f0eb">2</text>');
     expect(svg).toContain('font-weight="400" fill="#6e7681">1</text>');
+  });
+});
+
+describe("the versus picture", () => {
+  const side = (login: string) => ({ login, name: login, klass: "Rookie", tint: "#7c5cd6", look: defaultCharacter(login).look, avatar: null, team: [{ name: "one", color: "#d9482b", shiny: false }] });
+
+  // Regression guarded: a pasted battle link previewing only the face-off, so the post's claim of who won can't be seen.
+  test("marks the winner and how many cards they kept only when the battle is settled", () => {
+    expect(versusCard(side("abed"), side("troy"), "Space Grotesk")).not.toContain("WINNER");
+    const settled = versusCard(side("abed"), side("troy"), "Space Grotesk", { winner: "b", left: 1 });
+    expect(settled).toContain('text-anchor="end" font-size="36" letter-spacing="-0.5" fill="#f5c84b">WINNER · 1 card left</text>');
   });
 });
 
