@@ -230,7 +230,7 @@ function yearPage(login: string, stats: WrappedStats): string {
     `<h1>${escapeXml(login)}'s ${stats.year} in GitHub stars${stats.soFar ? " so far" : ""}</h1>` +
     `<p class="lead">${escapeXml(`${line} ${facts}`.trim())}</p>` +
     `<img class="card" src="/api/card/wrapped.svg?user=${escapeXml(login)}" width="1200" height="630" alt="${escapeXml(`${login}'s ${stats.year} in GitHub stars: ${line}`)}">` +
-    `<div class="next"><a class="button primary" href="/?user=${escapeXml(login)}">${escapeXml(sortText)}</a><a class="button" href="/run?me=${escapeXml(login)}">Or play a card battle with them</a></div>` +
+    `<div class="next"><a class="button primary" href="/organize?user=${escapeXml(login)}">${escapeXml(sortText)}</a><a class="button" href="/run?me=${escapeXml(login)}">Or play a card battle with them</a></div>` +
     `<p class="muted">Stard sorts your stars into GitHub Lists and flags the dead ones. No sign-in to look; a token to write Lists.</p>` +
     `<h2>Share it</h2><div class="share">` +
     `<a class="button" href="https://x.com/intent/tweet?text=${encodeURIComponent(post)}">Post on X</a>` +
