@@ -137,30 +137,22 @@ export function createApp(options: AppOptions): Hono {
     const github = createGitHubClient(token, options.githubApiUrl);
     const client = await pool.connect();
     try {
-      for await (const edges of starredPages(github)) {
-        let reachedKnown = false;
-        for (const edge of edges) {
-          const n = edge.node;
-          const { rows } = await client.query(
-            `INSERT INTO repos (github_id, node_id, name, full_name, owner, description, url, homepage, language, stars, forks, topics, starred_at, is_archived, pushed_at, created_at)
-             VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16)
-             ON CONFLICT (github_id) DO UPDATE SET
-               node_id=EXCLUDED.node_id, stars=EXCLUDED.stars, forks=EXCLUDED.forks,
-               description=EXCLUDED.description, topics=EXCLUDED.topics, language=EXCLUDED.language,
-               is_archived=EXCLUDED.is_archived, pushed_at=EXCLUDED.pushed_at
-             RETURNING (xmax = 0) AS inserted`,
-            [n.databaseId, n.id, n.name, n.nameWithOwner, n.owner.login,
-             n.description, n.url, n.homepageUrl, n.primaryLanguage?.name ?? null,
-             n.stargazerCount, n.forkCount, topicsOf(n), edge.starredAt,
-             n.isArchived ?? false, n.pushedAt ?? null, n.createdAt ?? null],
-          );
-          job.imported++;
-          if (!rows[0].inserted) reachedKnown = true;
+      let pass = await importStarPages(github, client, full, job);
+      if (!pass.complete) {
+        // The quick pass only sees new stars. When the count here differs from
+        // GitHub's, something was unstarred on GitHub (#191), so read them all.
+        const { viewer } = await github.graphql<{ viewer: { starredRepositories: { totalCount: number } } }>(
+          "query { viewer { starredRepositories { totalCount } } }",
+        );
+        const { rows } = await client.query("SELECT count(*)::int AS n FROM repos");
+        if (rows[0].n !== viewer.starredRepositories.totalCount) {
+          job.imported = 0;
+          pass = await importStarPages(github, client, true, job);
         }
-        // Stars come newest first, so once a page holds a repo we already had,
-        // everything after it is already stored too. A full import keeps going to
-        // refresh star counts and descriptions on the older ones.
-        if (!full && reachedKnown) break;
+      }
+      // A repo GitHub no longer lists as starred goes, as an unstar in this app does.
+      if (pass.complete) {
+        await client.query("DELETE FROM repos WHERE NOT (github_id = ANY($1::int[]))", [pass.seen]);
       }
       job.lists = await importGitHubLists(github, client);
       job.status = "done";
@@ -171,6 +163,38 @@ export function createApp(options: AppOptions): Hono {
       job.finishedAt = new Date().toISOString();
       client.release();
     }
+  }
+
+  /** Upserts starred repos, newest first. Stops at the first known page unless `full`. */
+  async function importStarPages(github: GitHubClient, client: DbClient, full: boolean, job: ImportJob) {
+    const seen: number[] = [];
+    for await (const edges of starredPages(github)) {
+      let reachedKnown = false;
+      for (const edge of edges) {
+        const n = edge.node;
+        const { rows } = await client.query(
+          `INSERT INTO repos (github_id, node_id, name, full_name, owner, description, url, homepage, language, stars, forks, topics, starred_at, is_archived, pushed_at, created_at)
+           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16)
+           ON CONFLICT (github_id) DO UPDATE SET
+             node_id=EXCLUDED.node_id, stars=EXCLUDED.stars, forks=EXCLUDED.forks,
+             description=EXCLUDED.description, topics=EXCLUDED.topics, language=EXCLUDED.language,
+             is_archived=EXCLUDED.is_archived, pushed_at=EXCLUDED.pushed_at
+           RETURNING (xmax = 0) AS inserted`,
+          [n.databaseId, n.id, n.name, n.nameWithOwner, n.owner.login,
+           n.description, n.url, n.homepageUrl, n.primaryLanguage?.name ?? null,
+           n.stargazerCount, n.forkCount, topicsOf(n), edge.starredAt,
+           n.isArchived ?? false, n.pushedAt ?? null, n.createdAt ?? null],
+        );
+        seen.push(n.databaseId);
+        job.imported++;
+        if (!rows[0].inserted) reachedKnown = true;
+      }
+      // Stars come newest first, so once a page holds a repo we already had,
+      // everything after it is already stored too. A full import keeps going to
+      // refresh star counts and descriptions on the older ones.
+      if (!full && reachedKnown) return { seen, complete: false };
+    }
+    return { seen, complete: true };
   }
 
   app.post("/api/import-stars", async (c) => {
