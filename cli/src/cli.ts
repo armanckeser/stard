@@ -23,6 +23,9 @@ Free software under the GNU AGPL v3 or later, with ABSOLUTELY NO WARRANTY.
 Source, license and bundled licenses: ${SOURCE_URL}
 Not affiliated with or endorsed by GitHub.`;
 
+// Printed once on quit, after the user has had a session with the organizer.
+const STAR_ASK = `If Stard saved you some sorting, a star on GitHub helps other people find the project: ${SOURCE_URL}`;
+
 const HELP = `Usage: npx github-stars-organizer [--port <number>] [--no-open]
        npx github-stars-organizer search <words> [--refresh] [--json] [--limit <n>]
 
@@ -179,6 +182,8 @@ async function main() {
     process.exit(EXIT_FAILURE);
   });
   process.on("SIGINT", () => {
+    console.log(`
+${STAR_ASK}`);
     server.close();
     process.exit(0);
   });
