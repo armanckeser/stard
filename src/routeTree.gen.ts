@@ -11,6 +11,7 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as TeamRouteImport } from './routes/team'
 import { Route as RunRouteImport } from './routes/run'
+import { Route as OrganizeRouteImport } from './routes/organize'
 import { Route as GameRouteImport } from './routes/game'
 import { Route as ExploreRouteImport } from './routes/explore'
 import { Route as ComposeRouteImport } from './routes/compose'
@@ -27,6 +28,11 @@ const TeamRoute = TeamRouteImport.update({
 const RunRoute = RunRouteImport.update({
   id: '/run',
   path: '/run',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const OrganizeRoute = OrganizeRouteImport.update({
+  id: '/organize',
+  path: '/organize',
   getParentRoute: () => rootRouteImport,
 } as any)
 const GameRoute = GameRouteImport.update({
@@ -72,6 +78,7 @@ export interface FileRoutesByFullPath {
   '/compose': typeof ComposeRoute
   '/explore': typeof ExploreRoute
   '/game': typeof GameRoute
+  '/organize': typeof OrganizeRoute
   '/run': typeof RunRoute
   '/team': typeof TeamRoute
   '/list/$listId': typeof ListListIdRoute
@@ -83,6 +90,7 @@ export interface FileRoutesByTo {
   '/compose': typeof ComposeRoute
   '/explore': typeof ExploreRoute
   '/game': typeof GameRoute
+  '/organize': typeof OrganizeRoute
   '/run': typeof RunRoute
   '/team': typeof TeamRoute
   '/list/$listId': typeof ListListIdRoute
@@ -95,6 +103,7 @@ export interface FileRoutesById {
   '/compose': typeof ComposeRoute
   '/explore': typeof ExploreRoute
   '/game': typeof GameRoute
+  '/organize': typeof OrganizeRoute
   '/run': typeof RunRoute
   '/team': typeof TeamRoute
   '/list/$listId': typeof ListListIdRoute
@@ -108,6 +117,7 @@ export interface FileRouteTypes {
     | '/compose'
     | '/explore'
     | '/game'
+    | '/organize'
     | '/run'
     | '/team'
     | '/list/$listId'
@@ -119,6 +129,7 @@ export interface FileRouteTypes {
     | '/compose'
     | '/explore'
     | '/game'
+    | '/organize'
     | '/run'
     | '/team'
     | '/list/$listId'
@@ -130,6 +141,7 @@ export interface FileRouteTypes {
     | '/compose'
     | '/explore'
     | '/game'
+    | '/organize'
     | '/run'
     | '/team'
     | '/list/$listId'
@@ -142,6 +154,7 @@ export interface RootRouteChildren {
   ComposeRoute: typeof ComposeRoute
   ExploreRoute: typeof ExploreRoute
   GameRoute: typeof GameRoute
+  OrganizeRoute: typeof OrganizeRoute
   RunRoute: typeof RunRoute
   TeamRoute: typeof TeamRoute
   ListListIdRoute: typeof ListListIdRoute
@@ -161,6 +174,13 @@ declare module '@tanstack/react-router' {
       path: '/run'
       fullPath: '/run'
       preLoaderRoute: typeof RunRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/organize': {
+      id: '/organize'
+      path: '/organize'
+      fullPath: '/organize'
+      preLoaderRoute: typeof OrganizeRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/game': {
@@ -222,6 +242,7 @@ const rootRouteChildren: RootRouteChildren = {
   ComposeRoute: ComposeRoute,
   ExploreRoute: ExploreRoute,
   GameRoute: GameRoute,
+  OrganizeRoute: OrganizeRoute,
   RunRoute: RunRoute,
   TeamRoute: TeamRoute,
   ListListIdRoute: ListListIdRoute,
