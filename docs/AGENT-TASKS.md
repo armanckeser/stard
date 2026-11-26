@@ -53,7 +53,7 @@ Needs Tasks 1 and 2 merged.
 
 - Shiny means the repo's owner is `armanckeser`, for every player. Today the code marks a player's own repos (`shiny` in `worker/src/battle.ts` and `server/battle.ts`). A player's own repo gets a "home" mark with no stat change.
 - After a battle or a run ends, one line under the result: a link "Star Stard on GitHub" and a share button that copies the battle link. No popup.
-- The Battle screen requests `/api/card/versus.png?a=&b=` in the background once both usernames are known, so the share picture is cached before anyone shares the link.
+- The Battle screen requests `/api/card/versus.png?a=&b=&d=` in the background once the battle has loaded, with the day the battle was drawn for, so the share picture is cached before anyone shares the link.
 - The SVG cards served for READMEs still show the owner's avatar; the app's cards show the creature. Note in the PR which is easier: an SVG creature per body plan, or leave as is.
 
 ## Task 5: freeze the facts in a match

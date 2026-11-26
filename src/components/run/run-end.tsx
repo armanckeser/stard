@@ -4,7 +4,8 @@ import { StarStard } from "@/components/star-stard";
 import { Customize } from "@/components/run/customize";
 import { TeamTiles } from "@/components/run/team-tiles";
 import { Input } from "@/components/ui/input";
-import { beatLine, beatenIn, challengeLink, challengeMessage, type RoundResult } from "@/lib/challenge";
+import { PostOnX, ShareSheet } from "@/components/share-buttons";
+import { beatLine, beatenIn, challengeLink, challengeMessage, challengeText, type RoundResult } from "@/lib/challenge";
 import { countEvent } from "@/lib/events";
 import { rememberWin } from "@/lib/level";
 import { APP_URL, validLogin } from "@/lib/published-list";
@@ -142,6 +143,12 @@ function Challenge({ beaten, link }: { beaten: string[]; link: string | null }) 
       <button type="submit" className="hud-button hud-fight run-panel-primary" disabled={!link || !nameOk}>
         {copying.state === "copied" ? <Check className="size-4" /> : <Swords className="size-4" />} {copying.state === "copied" ? "Copied" : "Challenge a friend"}
       </button>
+      {link && nameOk && (
+        <div className="flex flex-wrap justify-center gap-2">
+          <PostOnX text={challengeText(beaten, named)} url={challengeLink(link, named)} className="hud-button run-panel-link" />
+          <ShareSheet text={challengeText(beaten, named)} url={challengeLink(link, named)} className="hud-button run-panel-link" />
+        </div>
+      )}
       {copying.state === "failed" && (
         <label className="run-panel-note run-challenge-fallback">
           Couldn't copy. Send this link:
