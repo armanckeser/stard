@@ -48,13 +48,13 @@ describe("the end screen", () => {
     const player = poolFor("abed");
     render(<RunEnd player={player} seed="greendale" rounds={[]} results={results} team={[{ fighter: player.team[0], col: 1, row: 0 }]} wins={5} losses={0} onNewRun={() => {}} />);
     expect(screen.getByText("Run finished")).toBeTruthy();
-    expect(screen.getByText("You beat @simonw, @antfu, @tj and 2 more")).toBeTruthy();
+    expect(screen.getByText("You beat simonw, antfu, tj and 2 more")).toBeTruthy();
     fireEvent.change(screen.getByLabelText("Friend's GitHub username"), { target: { value: "@annie" } });
     const challenge = await screen.findByRole("button", { name: "Challenge a friend" });
     await vi.waitFor(() => expect((challenge as HTMLButtonElement).disabled).toBe(false));
     await act(async () => fireEvent.click(challenge));
     const written = (navigator.clipboard as unknown as { written: string[] }).written;
-    expect(written).toEqual([`I beat @simonw, @antfu, @tj and 2 more with my GitHub stars on Stard. @annie, beat my team: ${APP_URL}team?t=${TOKEN}&to=annie`]);
+    expect(written).toEqual([`I beat simonw, antfu, tj and 2 more with my GitHub stars on Stard. annie, beat my team: ${APP_URL}team?t=${TOKEN}&to=annie`]);
   });
 });
 

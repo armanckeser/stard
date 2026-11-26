@@ -371,12 +371,12 @@ test("the end screen names who the run beat, and copies a challenge with the fri
   await expect(page.getByText("Run finished")).toBeVisible();
   expect(new Set(beaten).size).toBe(5);
   const [first, second, third] = beaten;
-  await expect(page.getByText(`You beat @${first}, @${second}, @${third} and 2 more`)).toBeVisible();
+  await expect(page.getByText(`You beat ${first}, ${second}, ${third} and 2 more`)).toBeVisible();
 
   await page.getByLabel("Friend's GitHub username").fill("@annie");
   await page.getByRole("button", { name: "Challenge a friend" }).click();
   await expect(page.getByRole("button", { name: "Copied" }).first()).toBeVisible();
-  expect(await page.evaluate(() => navigator.clipboard.readText())).toBe(`I beat @${first}, @${second}, @${third} and 2 more with my GitHub stars on Stard. @annie, beat my team: ${APP_URL}team?t=${TOKEN}&to=annie`);
+  expect(await page.evaluate(() => navigator.clipboard.readText())).toBe(`I beat ${first}, ${second}, ${third} and 2 more with my GitHub stars on Stard. annie, beat my team: ${APP_URL}team?t=${TOKEN}&to=annie`);
 });
 
 /** abed's saved team, as GET /api/run/team answers for a link. */

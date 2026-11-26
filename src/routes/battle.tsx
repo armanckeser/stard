@@ -1,15 +1,17 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Layers, RotateCcw, Send, SkipForward, Swords } from "lucide-react";
-import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { CopyButton } from "@/components/copy-button";
+import { PostOnX, ShareSheet } from "@/components/share-buttons";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { Help } from "@/components/compose/controls";
 import { ArenaScene, ArenaStage, InspectOverlay, Nameplate, TextBox, repoName, type SideView, type Stance } from "@/components/battle/arena";
 import { Figure } from "@/components/battle/figure";
 import { MatchList } from "@/components/battle/match-list";
 import { StarStard } from "@/components/star-stard";
 import { RepoCard } from "@/components/battle/repo-card";
+import { battleText } from "@/lib/challenge";
 import { demoUser } from "@/lib/demo";
 import { CAN_PLAY, challenge, playingAs } from "@/lib/game-api";
 import { APP_URL, CARD_ORIGIN, validLogin } from "@/lib/published-list";
@@ -25,14 +27,17 @@ import { CLASSES, defaultCharacter, readLook, type Character } from "../../serve
 
 type Player = Character & { level: number; custom: boolean };
 type Team = { login: string; avatarUrl: string | null; supporter?: true; source: "profile" | "pinned" | "stars" | "repos"; character: Player; team: Fighter[] };
-type Battle = { a: Team; b: Team; seed: string; result: BattleResult };
+// `day` is the UTC day the Worker drew the battle for; a Worker from before shared links named their day sends none.
+type Battle = { a: Team; b: Team; seed: string; day?: string; result: BattleResult };
 
 export const Route = createFileRoute("/battle")({
   component: BattlePage,
-  // `play=1` skips the team screen: a shared link opens straight into the fight.
-  validateSearch: (search: Record<string, unknown>): { a?: string; b?: string; me?: string; play?: 1 } => ({
+  // `play=1` skips the team screen: a shared link opens straight into the fight. `d` is the
+  // day a shared battle was drawn for, so the link shows the fight that was shared.
+  validateSearch: (search: Record<string, unknown>): { a?: string; b?: string; d?: string; me?: string; play?: 1 } => ({
     a: typeof search.a === "string" ? search.a : undefined,
     b: typeof search.b === "string" ? search.b : undefined,
+    d: typeof search.d === "string" ? search.d : undefined,
     me: typeof search.me === "string" ? search.me : undefined,
     play: search.play === 1 || search.play === "1" ? 1 : undefined,
   }),
@@ -183,6 +188,7 @@ function BattlePage() {
   const [step, setStep] = useState(0);
   const [fast, setFast] = useState(false);
   const [inspecting, setInspecting] = useState<Fighter | null>(null);
+  const yourName = useRef<HTMLInputElement>(null);
 
   // Whose matches the hub lists: the account this copy plays as, else the name a link or the form gives.
   useEffect(() => {
@@ -205,7 +211,7 @@ function BattlePage() {
     setLoading(true);
     setError("");
     setBattle(null);
-    fetch(`${PLAY_ORIGIN}/api/battle?a=${encodeURIComponent(search.a)}&b=${encodeURIComponent(search.b)}`)
+    fetch(`${PLAY_ORIGIN}/api/battle?a=${encodeURIComponent(search.a)}&b=${encodeURIComponent(search.b)}${search.d ? `&d=${encodeURIComponent(search.d)}` : ""}`)
       .then(async (response) => {
         const body = (await response.json()) as Battle & { error?: string };
         if (stale) return;
@@ -225,14 +231,17 @@ function BattlePage() {
     };
     // A battle that is already showing stays put when only `play` changes.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [search.a, search.b]);
+  }, [search.a, search.b, search.d]);
+
+  // A shared link names the battle's day, so whoever opens the link later sees this same fight.
+  const query = battle ? `a=${encodeURIComponent(battle.a.login)}&b=${encodeURIComponent(battle.b.login)}${battle.day ? `&d=${battle.day}` : ""}` : "";
 
   // The share picture is slow to draw, so the Worker draws and caches it before anyone shares the link.
   // The npx app tells the website nothing until its player shares.
   useEffect(() => {
-    if (APP_MODE === "local" || !search.a || !search.b || !validLogin(search.a) || !validLogin(search.b)) return;
-    fetch(`${CARD_ORIGIN}/api/card/versus.png?a=${encodeURIComponent(search.a)}&b=${encodeURIComponent(search.b)}`).catch(() => {});
-  }, [search.a, search.b]);
+    if (APP_MODE === "local" || !query) return;
+    fetch(`${CARD_ORIGIN}/api/card/versus.png?${query}`).catch(() => {});
+  }, [query]);
 
   const total = battle?.result.events.length ?? 0;
   const done = battle !== null && phase === "fight" && step >= total;
@@ -251,16 +260,20 @@ function BattlePage() {
     if (ready) void navigate({ search: { a: a.trim(), b: b.trim() } });
   }
 
-  const query = battle ? `a=${encodeURIComponent(battle.a.login)}&b=${encodeURIComponent(battle.b.login)}` : "";
   // What a shared link opens: the fight itself, with no team screen first.
   const link = `${APP_URL}battle?${query}&play=1`;
-  let share = "";
-  if (battle && done) {
-    const { winner, standing } = battle.result;
-    const won = winner === "b" ? battle.b : battle.a;
-    const lost = winner === "b" ? battle.a : battle.b;
-    const left = standing[winner ?? "a"];
-    share = `[![${won.login} beat ${lost.login} with ${left} ${left === 1 ? "card" : "cards"} left](${CARD_ORIGIN}/api/card/battle.svg?${query})](${link})`;
+  const winner = battle?.result.winner === "b" ? battle.b : battle?.a;
+  const loser = battle?.result.winner === "b" ? battle.a : battle?.b;
+  const said = battle && winner && loser ? battleText(winner.login, loser.login, battle.result.standing[battle.result.winner ?? "a"]) : "";
+  const share = said ? `[![${said}](${CARD_ORIGIN}/api/card/battle.svg?${query})](${link})` : "";
+
+  // The next step for someone who opened a shared battle: their own team against the winner.
+  function takeOn(login: string) {
+    const mine = me ?? search.me ?? "";
+    if (validLogin(mine)) return void navigate({ search: { a: mine, b: login } });
+    setA("");
+    setB(login);
+    yourName.current?.focus();
   }
 
   const sideOf = (side: Side): SideView | null => {
@@ -284,7 +297,7 @@ function BattlePage() {
       </div>
 
       <form onSubmit={start} className="flex flex-wrap items-center gap-2">
-        <Input value={a} onChange={(e) => setA(e.target.value.replace(/^@/, ""))} placeholder="Your username" aria-label="Your GitHub username" autoCapitalize="none" autoCorrect="off" spellCheck={false} className="min-w-0 flex-1 basis-36" />
+        <Input ref={yourName} value={a} onChange={(e) => setA(e.target.value.replace(/^@/, ""))} placeholder="Your username" aria-label="Your GitHub username" autoCapitalize="none" autoCorrect="off" spellCheck={false} className="min-w-0 flex-1 basis-36" />
         <span className="text-xs font-medium uppercase tracking-wider text-muted-foreground">vs</span>
         <Input value={b} onChange={(e) => setB(e.target.value.replace(/^@/, ""))} placeholder="Their username" aria-label="Their GitHub username" autoCapitalize="none" autoCorrect="off" spellCheck={false} className="min-w-0 flex-1 basis-36" />
         <Button type="submit" disabled={!ready || loading}>
@@ -348,12 +361,17 @@ function BattlePage() {
             {done && <CopyButton text={share} label="Copy the result card" />}
             {!done && <CopyButton text={link} label="Copy link" />}
           </div>
-          {done && (
-            <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
-              <StarStard />
-              <CopyButton text={link} label="Share" />
+          {done && winner && (
+            <div className="mt-2 flex flex-wrap items-center gap-2">
+              <PostOnX text={said} url={link} className={buttonVariants({ size: "sm" })} />
+              <ShareSheet text={said} url={link} className={buttonVariants({ variant: "outline", size: "sm" })} />
+              <CopyButton text={link} label="Copy link" />
+              {winner.login.toLowerCase() !== (me ?? "").toLowerCase() && (
+                <Button variant="outline" size="sm" onClick={() => takeOn(winner.login)}><Swords /> You vs {winner.login}</Button>
+              )}
             </div>
           )}
+          {done && <div className="mt-2"><StarStard /></div>}
         </div>
       )}
 
