@@ -12,7 +12,7 @@ import { MatchList } from "@/components/battle/match-list";
 import { StarStard } from "@/components/star-stard";
 import { RepoCard } from "@/components/battle/repo-card";
 import { battleText } from "@/lib/challenge";
-import { demoUser } from "@/lib/demo";
+import { demoSnapshotUser, demoUser } from "@/lib/demo";
 import { CAN_PLAY, challenge, playingAs } from "@/lib/game-api";
 import { APP_URL, CARD_ORIGIN, validLogin } from "@/lib/published-list";
 import { APP_MODE } from "@/lib/mode";
@@ -262,15 +262,19 @@ function BattlePage() {
 
   // What a shared link opens: the fight itself, with no team screen first.
   const link = `${APP_URL}battle?${query}&play=1`;
-  const winner = battle?.result.winner === "b" ? battle.b : battle?.a;
-  const loser = battle?.result.winner === "b" ? battle.a : battle?.b;
-  const said = battle && winner && loser ? battleText(winner.login, loser.login, battle.result.standing[battle.result.winner ?? "a"]) : "";
+  const won = battle?.result.winner ?? null;
+  const winner = battle && won ? battle[won] : null;
+  const said = battle && winner ? battleText(winner.login, battle[otherSide(won!)].login, battle.result.standing[won!]) : "";
   const share = said ? `[![${said}](${CARD_ORIGIN}/api/card/battle.svg?${query})](${link})` : "";
 
   // The next step for someone who opened a shared battle: their own team against the winner.
+  // The username fields hold the shared link's two sides, and the demo starts on its owner's stars,
+  // so "you" is only an account this copy plays as, the link's `me`, or a username the visitor loaded.
+  const loaded = demoUser.current !== demoSnapshotUser ? demoUser.current : null;
+  const you = [me, search.me, loaded].find((login) => login && validLogin(login)) ?? null;
+  const inBattle = you !== null && battle !== null && [battle.a.login, battle.b.login].some((login) => login.toLowerCase() === you.toLowerCase());
   function takeOn(login: string) {
-    const mine = me ?? search.me ?? "";
-    if (validLogin(mine)) return void navigate({ search: { a: mine, b: login } });
+    if (you) return void navigate({ search: { a: you, b: login, me: search.me } });
     setA("");
     setB(login);
     yourName.current?.focus();
@@ -366,7 +370,7 @@ function BattlePage() {
               <PostOnX text={said} url={link} className={buttonVariants({ size: "sm" })} />
               <ShareSheet text={said} url={link} className={buttonVariants({ variant: "outline", size: "sm" })} />
               <CopyButton text={link} label="Copy link" />
-              {winner.login.toLowerCase() !== (me ?? "").toLowerCase() && (
+              {!inBattle && (
                 <Button variant="outline" size="sm" onClick={() => takeOn(winner.login)}><Swords /> You vs {winner.login}</Button>
               )}
             </div>
