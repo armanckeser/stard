@@ -200,6 +200,19 @@ describe("unstarring", () => {
     expect(await rows("SELECT 1 FROM repos WHERE github_id = 1003")).toEqual([]);
   });
 
+  test("import_drops_a_repo_unstarred_on_github_since_the_last_import", async () => {
+    // Regression guarded (#191): the quick import stopped at the first known star,
+    // so a repo unstarred on GitHub stayed here forever.
+    const { fake, call, rows } = await setUp();
+    fake.repos.find((repo) => repo.databaseId === 1003)!.starredAt = null;
+
+    const { json } = await call("POST", "/api/import-stars?wait=1", {});
+
+    expect(json.status).toBe("done");
+    expect(await rows("SELECT 1 FROM repos WHERE github_id = 1003")).toEqual([]);
+    expect(await rows("SELECT 1 FROM repos")).toHaveLength(4);
+  });
+
   test("unstar_keeps_the_repo_when_github_cannot_be_reached", async () => {
     // Regression guarded: a failed unstar deleted the repo here (and its tags,
     // rating and notes) while it stayed starred on GitHub.
